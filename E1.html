@@ -1,0 +1,736 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Rescuenow | Emergency Hub</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
+        
+        body {
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            background-color: #f8fafc;
+            color: #0f172a;
+            -webkit-tap-highlight-color: transparent;
+            overflow: hidden;
+        }
+
+        .glass-nav {
+            background: rgba(255, 255, 255, 0.85);
+            backdrop-filter: blur(25px) saturate(200%);
+            -webkit-backdrop-filter: blur(25px) saturate(200%);
+        }
+
+        .sos-btn-main {
+            background: radial-gradient(circle at center, #ef4444 0%, #dc2626 100%);
+            box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.4), 
+                        0 25px 50px -12px rgba(220, 38, 38, 0.5);
+            border: 10px solid white;
+        }
+
+        .pulse-ring {
+            animation: pulse-ring 2s cubic-bezier(0.455, 0.03, 0.515, 0.955) infinite;
+        }
+
+        @keyframes pulse-ring {
+            0% { transform: scale(0.8); opacity: 0.5; }
+            80%, 100% { transform: scale(1.6); opacity: 0; }
+        }
+
+        .tab-content {
+            display: none;
+            height: calc(100vh - 85px);
+            overflow-y: auto;
+            scroll-behavior: smooth;
+        }
+
+        .tab-content.active {
+            display: block;
+            animation: fadeIn 0.4s ease-out;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .hide-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+
+        #sos-modal {
+            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .category-pill.active {
+            background: #ef4444;
+            color: white;
+            box-shadow: 0 10px 15px -3px rgba(239, 68, 68, 0.3);
+        }
+
+        .img-overlay {
+            background: linear-gradient(to top, rgba(0,0,0,0.85) 0%, rgba(0,0,0,0.2) 50%, rgba(0,0,0,0) 100%);
+        }
+        
+        .locator-card {
+            background-size: cover;
+            background-position: center;
+        }
+    </style>
+</head>
+<body class="selection:bg-red-100">
+
+    <!-- SOS TRIGGER MODAL -->
+    <div id="sos-modal" class="fixed inset-0 z-[100] bg-black translate-y-full opacity-0 flex flex-col">
+        <div class="p-8 flex justify-between items-center bg-red-600 shrink-0 shadow-2xl">
+            <h2 class="text-white text-2xl font-black italic tracking-tighter">EMERGENCY BROADCAST</h2>
+            <button onclick="toggleSOS(false)" class="w-12 h-12 rounded-full bg-white/20 text-white flex items-center justify-center backdrop-blur-md">
+                <i class="fa-solid fa-xmark"></i>
+            </button>
+        </div>
+        <div class="flex-grow overflow-y-auto p-6 space-y-6 hide-scrollbar">
+            <a href="tel:112" class="block w-full bg-white text-red-600 rounded-[2.5rem] p-10 text-center shadow-2xl active:scale-95 transition-transform">
+                <span class="block text-xs font-black uppercase tracking-widest text-red-400 mb-2">Primary Emergency</span>
+                <span class="block text-7xl font-black tracking-tighter">112</span>
+            </a>
+            <div id="sos-grid" class="grid grid-cols-2 gap-4"></div>
+
+            <!-- Medical ID Display in SOS -->
+            <div id="sos-medical-display" class="bg-white/10 border border-white/20 p-5 rounded-[2rem] text-white hidden">
+                <h3 class="text-white/50 text-[10px] font-black uppercase tracking-widest mb-3"><i class="fa-solid fa-notes-medical mr-2"></i>Medical ID</h3>
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <span class="block text-white/40 text-[10px] uppercase font-bold tracking-wider mb-1">Blood Group</span>
+                        <span id="sos-display-blood" class="font-black text-2xl text-red-400">-</span>
+                    </div>
+                    <div>
+                        <span class="block text-white/40 text-[10px] uppercase font-bold tracking-wider mb-1">Allergies</span>
+                        <span id="sos-display-allergies" class="font-bold text-sm leading-tight">-</span>
+                    </div>
+                </div>
+            </div>
+
+            <div id="sos-personal-section" class="pt-2 hidden">
+                <h3 class="text-white/40 text-xs font-black uppercase tracking-[0.2em] mb-4 ml-2">Family & Friends</h3>
+                <div id="sos-personal-list" class="space-y-3"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- MAIN VIEWPORT -->
+    <main id="viewport" class="relative">
+
+        <!-- HOME -->
+        <section id="tab-home" class="tab-content active hide-scrollbar">
+            <div class="relative h-[48vh] flex flex-col items-center justify-center overflow-hidden">
+                <img src="https://images.unsplash.com/photo-1516574187841-cb9cc2ca948b?auto=format&fit=crop&w=1200&q=80" class="absolute inset-0 w-full h-full object-cover">
+                <div class="absolute inset-0 bg-white/80 backdrop-blur-[2px]"></div>
+                
+                <div class="text-center z-10 mb-8">
+                    <h1 class="text-4xl font-extrabold text-slate-900 tracking-tight">RescueNow</h1>
+                    <p class="text-slate-600 font-semibold uppercase tracking-widest text-[10px] mt-1">Ready for anything</p>
+                </div>
+                
+                <div class="relative z-10">
+                    <div class="absolute inset-0 pulse-ring bg-red-500 rounded-full"></div>
+                    <button onclick="toggleSOS(true)" class="sos-btn-main w-44 h-44 rounded-full flex items-center justify-center relative active:scale-90 transition-transform">
+                        <span class="text-white text-5xl font-black tracking-tighter">SOS</span>
+                    </button>
+                </div>
+            </div>
+
+            <div class="px-6 -mt-10 relative z-20 space-y-4 max-w-md mx-auto pb-10">
+                <div class="grid grid-cols-2 gap-4">
+                    <button onclick="switchTab('contacts')" class="p-6 bg-white rounded-[2.5rem] shadow-xl shadow-slate-200/50 flex flex-col items-start gap-4 active:scale-95 transition-transform">
+                        <div class="w-12 h-12 bg-indigo-50 text-indigo-600 rounded-2xl flex items-center justify-center text-xl"><i class="fa-solid fa-address-book"></i></div>
+                        <span class="font-bold text-slate-800">Phone Circle</span>
+                    </button>
+                    <button onclick="switchTab('nearby')" class="p-6 bg-white rounded-[2.5rem] shadow-xl shadow-slate-200/50 flex flex-col items-start gap-4 active:scale-95 transition-transform">
+                        <div class="w-12 h-12 bg-emerald-50 text-emerald-600 rounded-2xl flex items-center justify-center text-xl"><i class="fa-solid fa-map-location-dot"></i></div>
+                        <span class="font-bold text-slate-800">Find Help</span>
+                    </button>
+                </div>
+
+                <button onclick="switchTab('medical')" class="w-full p-6 bg-white rounded-[2.5rem] shadow-xl shadow-slate-200/50 flex items-center gap-5 active:scale-95 transition-transform text-left">
+                    <div class="w-14 h-14 bg-rose-50 text-rose-500 rounded-2xl flex items-center justify-center text-2xl shrink-0"><i class="fa-solid fa-heart-pulse"></i></div>
+                    <div>
+                        <h4 class="font-bold text-slate-800 text-lg">Medical Profile</h4>
+                        <p class="text-slate-500 text-xs font-medium">Blood group, allergies & prescriptions</p>
+                    </div>
+                    <i class="fa-solid fa-chevron-right ml-auto text-slate-300"></i>
+                </button>
+                
+                <div onclick="switchTab('firstaid')" class="relative h-36 rounded-[2.5rem] overflow-hidden group cursor-pointer shadow-lg active:scale-95 transition-transform">
+                    <img src="https://images.unsplash.com/photo-1505751172876-fa1923c5c528?auto=format&fit=crop&w=800&q=80" class="absolute inset-0 w-full h-full object-cover">
+                    <div class="absolute inset-0 bg-gradient-to-r from-red-700/90 to-transparent flex flex-col justify-center px-8">
+                        <span class="text-white/70 text-[10px] font-black uppercase tracking-widest">Medical Emergencies</span>
+                        <h3 class="text-white text-2xl font-bold">First Aid Wiki</h3>
+                    </div>
+                </div>
+
+                <div onclick="switchTab('disaster')" class="relative h-36 rounded-[2.5rem] overflow-hidden group cursor-pointer shadow-lg active:scale-95 transition-transform">
+                    <img src="https://images.unsplash.com/photo-1454789548928-9efd52dc4031?auto=format&fit=crop&w=800&q=80" class="absolute inset-0 w-full h-full object-cover">
+                    <div class="absolute inset-0 bg-gradient-to-r from-amber-700/90 to-transparent flex flex-col justify-center px-8">
+                        <span class="text-white/70 text-[10px] font-black uppercase tracking-widest">Natural Calamities</span>
+                        <h3 class="text-white text-2xl font-bold">Disaster Guide</h3>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- CONTACTS -->
+        <section id="tab-contacts" class="tab-content px-6 py-10 hide-scrollbar bg-white">
+            <h2 class="text-3xl font-black tracking-tighter mb-8">Phone Circle</h2>
+            <div id="standard-numbers" class="space-y-3 mb-12"></div>
+            
+            <div class="bg-slate-50 rounded-[3rem] p-6 border border-slate-100">
+                <h3 class="font-black text-slate-400 text-xs uppercase tracking-[0.2em] mb-6 ml-2">Trusted Contacts</h3>
+                <div id="personal-list" class="space-y-4 mb-8"></div>
+                <form id="contact-form" class="space-y-3">
+                    <input type="text" id="nameInput" placeholder="Name (e.g. Mom)" class="w-full bg-white p-5 rounded-3xl border-none shadow-sm focus:ring-2 focus:ring-red-500 font-semibold" required>
+                    <input type="tel" id="numInput" placeholder="Number" class="w-full bg-white p-5 rounded-3xl border-none shadow-sm focus:ring-2 focus:ring-red-500 font-semibold" required>
+                    <button type="submit" class="w-full bg-slate-900 text-white p-5 rounded-3xl font-bold active:scale-95 transition-transform">Add to Circle</button>
+                </form>
+            </div>
+        </section>
+
+        <!-- MEDICAL ASSISTANT -->
+        <section id="tab-medical" class="tab-content px-6 py-10 hide-scrollbar bg-slate-50">
+            <div class="flex items-center gap-4 mb-8">
+                <div class="w-12 h-12 rounded-full bg-rose-100 text-rose-500 flex items-center justify-center text-xl shadow-sm">
+                    <i class="fa-solid fa-notes-medical"></i>
+                </div>
+                <h2 class="text-3xl font-black tracking-tighter">Medical ID</h2>
+            </div>
+            
+            <div class="space-y-6">
+                <!-- Basic Medical Info -->
+                <div class="bg-white rounded-[2.5rem] p-6 shadow-xl shadow-slate-200/50">
+                    <h3 class="font-black text-rose-500 text-xs uppercase tracking-[0.2em] mb-5">Vital Info</h3>
+                    
+                    <div class="space-y-4">
+                        <div>
+                            <label class="block text-[10px] font-black uppercase tracking-wider text-slate-400 mb-1 ml-2">Blood Group</label>
+                            <div class="relative">
+                                <select id="med-blood" onchange="saveMedicalBasicInfo()" class="w-full bg-slate-50 p-4 rounded-2xl border-none font-bold text-slate-800 outline-none focus:ring-2 focus:ring-rose-500 appearance-none">
+                                    <option value="">Select Blood Group</option>
+                                    <option value="A+">A+</option>
+                                    <option value="A-">A-</option>
+                                    <option value="B+">B+</option>
+                                    <option value="B-">B-</option>
+                                    <option value="O+">O+</option>
+                                    <option value="O-">O-</option>
+                                    <option value="AB+">AB+</option>
+                                    <option value="AB-">AB-</option>
+                                </select>
+                                <i class="fa-solid fa-chevron-down absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 text-sm pointer-events-none"></i>
+                            </div>
+                        </div>
+                        
+                        <div>
+                            <label class="block text-[10px] font-black uppercase tracking-wider text-slate-400 mb-1 ml-2">Allergies</label>
+                            <input type="text" id="med-allergies" oninput="saveMedicalBasicInfo()" placeholder="e.g. Peanuts, Penicillin" class="w-full bg-slate-50 p-4 rounded-2xl border-none font-semibold text-slate-800 outline-none focus:ring-2 focus:ring-rose-500">
+                        </div>
+
+                        <div>
+                            <label class="block text-[10px] font-black uppercase tracking-wider text-slate-400 mb-1 ml-2">Medical Conditions</label>
+                            <input type="text" id="med-conditions" oninput="saveMedicalBasicInfo()" placeholder="e.g. Asthma, Diabetes" class="w-full bg-slate-50 p-4 rounded-2xl border-none font-semibold text-slate-800 outline-none focus:ring-2 focus:ring-rose-500">
+                        </div>
+
+                        <div>
+                            <label class="block text-[10px] font-black uppercase tracking-wider text-slate-400 mb-1 ml-2">Emergency Doctor</label>
+                            <input type="text" id="med-doctor" oninput="saveMedicalBasicInfo()" placeholder="Doctor's Name & Number" class="w-full bg-slate-50 p-4 rounded-2xl border-none font-semibold text-slate-800 outline-none focus:ring-2 focus:ring-rose-500">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Prescriptions -->
+                <div class="bg-white rounded-[2.5rem] p-6 shadow-xl shadow-slate-200/50">
+                     <h3 class="font-black text-rose-500 text-xs uppercase tracking-[0.2em] mb-5">Prescriptions</h3>
+                     
+                     <div id="medicine-list" class="space-y-3 mb-6"></div>
+                     
+                     <form id="med-form" class="space-y-3 bg-slate-50 p-4 rounded-[2rem]">
+                         <input type="text" id="med-name" placeholder="Medicine Name" class="w-full bg-white p-4 rounded-2xl border-none shadow-sm focus:ring-2 focus:ring-rose-500 font-semibold" required>
+                         <input type="text" id="med-timing" placeholder="Dosage Timing (e.g. 1-0-1 or Night)" class="w-full bg-white p-4 rounded-2xl border-none shadow-sm focus:ring-2 focus:ring-rose-500 font-semibold" required>
+                         <button type="submit" class="w-full bg-slate-900 text-white p-4 rounded-2xl font-bold active:scale-95 transition-transform flex justify-center items-center gap-2">
+                             <i class="fa-solid fa-plus text-sm"></i> Add Medicine
+                         </button>
+                     </form>
+                </div>
+
+                <!-- Common Medicine Reference -->
+                <div class="bg-white rounded-[2.5rem] p-6 shadow-xl shadow-slate-200/50">
+                     <h3 class="font-black text-rose-500 text-xs uppercase tracking-[0.2em] mb-2">General Recommendations</h3>
+                     <p class="text-xs text-slate-400 mb-4 font-medium leading-relaxed">Common generic medicines for general conditions. <strong class="text-rose-400">Always consult a doctor before use.</strong></p>
+                     
+                     <div class="relative mb-4">
+                         <select id="med-recommend-select" onchange="showRecommendations()" class="w-full bg-slate-50 p-4 rounded-2xl border-none font-bold text-slate-800 outline-none focus:ring-2 focus:ring-rose-500 appearance-none">
+                             <option value="">Select a condition...</option>
+                             <option value="flu">Flu & Common Cold</option>
+                             <option value="fever">Fever & Body Ache</option>
+                             <option value="acidity">Acidity & Heartburn</option>
+                             <option value="diabetes">Diabetes (Type 2)</option>
+                             <option value="bp">High Blood Pressure</option>
+                             <option value="allergy">Mild Allergies</option>
+                         </select>
+                         <i class="fa-solid fa-chevron-down absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 text-sm pointer-events-none"></i>
+                     </div>
+                     
+                     <div id="recommendation-results" class="hidden space-y-3">
+                         <!-- Results populated by JS -->
+                     </div>
+                </div>
+
+            </div>
+            <div class="h-10"></div> <!-- Bottom padding -->
+        </section>
+
+        <!-- NEARBY -->
+        <section id="tab-nearby" class="tab-content px-6 py-10 hide-scrollbar">
+            <h2 class="text-3xl font-black tracking-tighter mb-2">Locator</h2>
+            <p class="text-slate-500 font-medium mb-8">Find verified facilities nearby.</p>
+            
+            <div class="space-y-4">
+                <button onclick="findNearby('hospital')" class="w-full relative h-32 rounded-[2.5rem] overflow-hidden shadow-xl active:scale-95 transition-transform text-left">
+                    <img src="https://images.unsplash.com/photo-1519494026892-80bbd2d6fd0d?auto=format&fit=crop&w=600&q=80" class="absolute inset-0 w-full h-full object-cover">
+                    <div class="absolute inset-0 bg-red-900/40 backdrop-blur-[1px]"></div>
+                    <div class="relative p-8 flex items-center">
+                        <div class="w-14 h-14 bg-white/20 backdrop-blur-md rounded-2xl flex items-center justify-center text-white text-2xl"><i class="fa-solid fa-hospital"></i></div>
+                        <div class="ml-5">
+                            <h4 class="font-bold text-white text-xl">Hospitals</h4>
+                            <p class="text-white/70 text-sm">Emergency & Trauma</p>
+                        </div>
+                    </div>
+                </button>
+
+                <button onclick="findNearby('police station')" class="w-full relative h-32 rounded-[2.5rem] overflow-hidden shadow-xl active:scale-95 transition-transform text-left">
+                    <img src="https://images.unsplash.com/photo-1563206767-5b18f218e7de?auto=format&fit=crop&w=600&q=80" class="absolute inset-0 w-full h-full object-cover">
+                    <div class="absolute inset-0 bg-blue-900/40 backdrop-blur-[1px]"></div>
+                    <div class="relative p-8 flex items-center">
+                        <div class="w-14 h-14 bg-white/20 backdrop-blur-md rounded-2xl flex items-center justify-center text-white text-2xl"><i class="fa-solid fa-building-shield"></i></div>
+                        <div class="ml-5">
+                            <h4 class="font-bold text-white text-xl">Police</h4>
+                            <p class="text-white/70 text-sm">Public Safety & Help</p>
+                        </div>
+                    </div>
+                </button>
+
+                <button onclick="findNearby('fire station')" class="w-full relative h-32 rounded-[2.5rem] overflow-hidden shadow-xl active:scale-95 transition-transform text-left">
+                    <img src="https://images.unsplash.com/photo-1534447677768-be436bb09401?auto=format&fit=crop&w=600&q=80" class="absolute inset-0 w-full h-full object-cover">
+                    <div class="absolute inset-0 bg-orange-900/40 backdrop-blur-[1px]"></div>
+                    <div class="relative p-8 flex items-center">
+                        <div class="w-14 h-14 bg-white/20 backdrop-blur-md rounded-2xl flex items-center justify-center text-white text-2xl"><i class="fa-solid fa-fire"></i></div>
+                        <div class="ml-5">
+                            <h4 class="font-bold text-white text-xl">Fire Brigade</h4>
+                            <p class="text-white/70 text-sm">Rescue Operations</p>
+                        </div>
+                    </div>
+                </button>
+
+                <button onclick="findNearby('pharmacy')" class="w-full relative h-32 rounded-[2.5rem] overflow-hidden shadow-xl active:scale-95 transition-transform text-left">
+                    <img src="https://images.unsplash.com/photo-1576091160550-2173dba999ef?auto=format&fit=crop&w=600&q=80" class="absolute inset-0 w-full h-full object-cover">
+                    <div class="absolute inset-0 bg-emerald-900/40 backdrop-blur-[1px]"></div>
+                    <div class="relative p-8 flex items-center">
+                        <div class="w-14 h-14 bg-white/20 backdrop-blur-md rounded-2xl flex items-center justify-center text-white text-2xl"><i class="fa-solid fa-pills"></i></div>
+                        <div class="ml-5">
+                            <h4 class="font-bold text-white text-xl">Pharmacies</h4>
+                            <p class="text-white/70 text-sm">Medical Supplies</p>
+                        </div>
+                    </div>
+                </button>
+            </div>
+        </section>
+
+        <!-- FIRST AID WIKI -->
+        <section id="tab-firstaid" class="tab-content hide-scrollbar">
+            <div class="sticky top-0 bg-white/95 backdrop-blur-md px-6 py-6 border-b z-30">
+                <h2 class="text-2xl font-black tracking-tight mb-4">First Aid Library</h2>
+                <div class="flex gap-2 overflow-x-auto hide-scrollbar" id="aid-categories"></div>
+            </div>
+            <div id="firstaid-cards" class="px-6 py-8 space-y-12"></div>
+        </section>
+
+        <!-- DISASTER GUIDE -->
+        <section id="tab-disaster" class="tab-content hide-scrollbar">
+             <div class="sticky top-0 bg-white/95 backdrop-blur-md px-6 py-6 border-b z-30">
+                <h2 class="text-2xl font-black tracking-tight mb-4">Survival Guide</h2>
+                <div class="flex gap-2 overflow-x-auto hide-scrollbar" id="disaster-categories"></div>
+            </div>
+            <div id="disaster-cards" class="px-6 py-8 space-y-12"></div>
+        </section>
+
+    </main>
+
+    <!-- NAVIGATION BAR -->
+    <nav class="fixed bottom-0 left-0 right-0 glass-nav border-t border-slate-100 pb-safe z-50">
+        <div class="max-w-md mx-auto flex justify-around items-center px-2 py-3">
+            <button onclick="switchTab('home')" class="nav-item flex flex-col items-center gap-1 text-red-600" data-id="home">
+                <i class="fa-solid fa-house-chimney-crack text-xl"></i>
+                <span class="text-[9px] font-black uppercase tracking-widest">Home</span>
+            </button>
+            <button onclick="switchTab('contacts')" class="nav-item flex flex-col items-center gap-1 text-slate-400" data-id="contacts">
+                <i class="fa-solid fa-phone-volume text-xl"></i>
+                <span class="text-[9px] font-black uppercase tracking-widest">Circle</span>
+            </button>
+            <button onclick="switchTab('medical')" class="nav-item flex flex-col items-center gap-1 text-slate-400" data-id="medical">
+                <i class="fa-solid fa-notes-medical text-xl"></i>
+                <span class="text-[9px] font-black uppercase tracking-widest">Medical</span>
+            </button>
+            <button onclick="switchTab('nearby')" class="nav-item flex flex-col items-center gap-1 text-slate-400" data-id="nearby">
+                <i class="fa-solid fa-location-arrow text-xl"></i>
+                <span class="text-[9px] font-black uppercase tracking-widest">Maps</span>
+            </button>
+            <button onclick="switchTab('firstaid')" class="nav-item flex flex-col items-center gap-1 text-slate-400" data-id="firstaid">
+                <i class="fa-solid fa-briefcase-medical text-xl"></i>
+                <span class="text-[9px] font-black uppercase tracking-widest">Wiki</span>
+            </button>
+        </div>
+    </nav>
+
+    <script>
+        // --- DATA ---
+        const CONTACTS = [
+            { name: 'National Emergency', num: '112', color: 'bg-red-600', icon: 'fa-shield-halved' },
+            { name: 'Ambulance', num: '102', color: 'bg-emerald-600', icon: 'fa-truck-medical' },
+            { name: 'Police', num: '100', color: 'bg-blue-600', icon: 'fa-user-shield' },
+            { name: 'Fire Force', num: '101', color: 'bg-orange-600', icon: 'fa-fire' }
+        ];
+
+        const FIRST_AID_DATA = [
+            {
+                id: 'heart', title: 'Cardiac Arrest (CPR)', img: 'https://images.unsplash.com/photo-1516574187841-cb9cc2ca948b?auto=format&fit=crop&w=800&q=80',
+                steps: [ 'Confirm scene safety.', 'Check responsiveness (tap/shout).', 'If unresponsive, call 112 immediately.', 'Start chest compressions: Push hard and fast (100-120/min).', 'Allow full chest recoil between compressions.', 'Continue until help arrives or an AED is used.' ]
+            },
+            {
+                id: 'bleed', title: 'Severe Bleeding', img: 'https://images.unsplash.com/photo-1612277795421-9bc7706a4a34?auto=format&fit=crop&w=800&q=80',
+                steps: [ 'Apply direct pressure with a clean cloth.', 'Keep constant pressure; do not lift to check.', 'If bleeding persists, apply a tourniquet above the wound.', 'Wrap the victim to prevent shock.', 'Elevate the wound above heart level.' ]
+            },
+            {
+                id: 'choke', title: 'Choking (Heimlich)', img: 'https://images.unsplash.com/photo-1559839734-2b71f1e59816?auto=format&fit=crop&w=800&q=80',
+                steps: [ 'Ask "Are you choking?"', 'Stand behind them, wrap arms around waist.', 'Make a fist, place thumb-side above the navel.', 'Perform quick, upward abdominal thrusts.', 'Repeat until object is expelled or they lose consciousness.' ]
+            },
+            {
+                id: 'burn', title: 'Serious Burns', img: 'https://images.unsplash.com/photo-1584820927498-cfe5211fd8bf?auto=format&fit=crop&w=800&q=80',
+                steps: [ 'Stop the burn (Remove heat/fire).', 'Cool with room-temperature water for 20 mins.', 'Remove jewelry before the area swells.', 'Cover loosely with sterile plastic wrap.', 'Never apply ice, butter, or ointments.' ]
+            },
+            {
+                id: 'stroke', title: 'Stroke (F.A.S.T)', img: 'https://images.unsplash.com/photo-1505751172876-fa1923c5c528?auto=format&fit=crop&w=800&q=80',
+                steps: [ 'FACE: Ask them to smile. Does one side droop?', 'ARMS: Ask them to raise both arms. Does one drift down?', 'SPEECH: Ask them to repeat a simple phrase. Is it slurred?', 'TIME: If any signs are present, call 112 immediately.', 'Note the time when symptoms first started.' ]
+            }
+        ];
+
+        const DISASTER_DATA = [
+            {
+                id: 'quake', title: 'Earthquake Survival', img: 'https://images.unsplash.com/photo-1506540328221-99af93b79da9?auto=format&fit=crop&w=800&q=80',
+                steps: [ 'DROP: Get on your hands and knees.', 'COVER: Protect your head/neck under sturdy furniture.', 'HOLD ON: Stay put until the shaking stops.', 'Avoid glass, windows, and heavy objects.', 'If outdoors, move to an open area away from structures.' ]
+            },
+            {
+                id: 'flood', title: 'Flash Flood Safety', img: 'https://images.unsplash.com/photo-1547683905-f686c993aae5?auto=format&fit=crop&w=800&q=80',
+                steps: [ 'Move to higher ground immediately.', 'Never walk or drive through flood waters.', 'Avoid bridges over fast-moving currents.', 'If trapped in a car, climb onto the roof if water rises.', 'Stay away from downed power lines.' ]
+            },
+            {
+                id: 'fire', title: 'House Fire Protocol', img: 'https://images.unsplash.com/photo-1601053896898-35ed0cb85bba?auto=format&fit=crop&w=800&q=80',
+                steps: [ 'Get out immediately. Do not stop for items.', 'Crawl low under smoke to find exits.', 'Check doors for heat before opening.', 'Stop, Drop, and Roll if your clothing catches fire.', 'Call 112 only once you are safely outside.' ]
+            },
+            {
+                id: 'storm', title: 'Severe Storm/Cyclone', img: 'https://images.unsplash.com/photo-1527482797697-8795b05a13fe?auto=format&fit=crop&w=800&q=80',
+                steps: [ 'Stay indoors in a reinforced room or basement.', 'Keep away from glass windows and doors.', 'Unplug electronic appliances.', 'Have your emergency kit and water ready.', 'Listen to radio/official alerts for updates.' ]
+            }
+        ];
+
+        let personalContacts = JSON.parse(localStorage.getItem('rescueContacts') || '[]');
+        let medicalProfile = JSON.parse(localStorage.getItem('rescueMedical')) || {
+            bloodGroup: '', allergies: '', conditions: '', doctorName: '', medicines: []
+        };
+
+        const RECOMMENDED_MEDICINES = {
+            'flu': [
+                { name: 'Paracetamol (500mg)', usage: 'For fever & mild pain' },
+                { name: 'Cetirizine (10mg)', usage: 'For runny nose/allergies' },
+                { name: 'Dextromethorphan', usage: 'For dry cough relief' }
+            ],
+            'fever': [
+                { name: 'Ibuprofen (400mg)', usage: 'For inflammation and pain' },
+                { name: 'Acetaminophen (500mg)', usage: 'For fever reduction' }
+            ],
+            'acidity': [
+                { name: 'Pantoprazole (40mg)', usage: 'For severe acid reflux (empty stomach)' },
+                { name: 'Antacid Gel (e.g., Digene)', usage: 'Immediate heartburn relief' }
+            ],
+            'diabetes': [
+                { name: 'Metformin', usage: 'First-line medication (Prescription only)' },
+                { name: 'Glimepiride', usage: 'To lower blood sugar (Prescription only)' }
+            ],
+            'bp': [
+                { name: 'Amlodipine (5mg)', usage: 'Calcium channel blocker (Prescription only)' },
+                { name: 'Losartan (50mg)', usage: 'Angiotensin receptor blocker (Prescription only)' }
+            ],
+            'allergy': [
+                { name: 'Loratadine (10mg)', usage: 'Non-drowsy antihistamine' },
+                { name: 'Diphenhydramine', usage: 'For severe reactions (may cause drowsiness)' }
+            ]
+        };
+
+        // --- NAVIGATION ---
+        function switchTab(tabId) {
+            document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+            document.getElementById(`tab-${tabId}`).classList.add('active');
+            
+            document.querySelectorAll('.nav-item').forEach(n => {
+                if (n.dataset.id === tabId) {
+                    n.classList.replace('text-slate-400', 'text-red-600');
+                } else {
+                    n.classList.replace('text-red-600', 'text-slate-400');
+                }
+            });
+        }
+
+        function toggleSOS(show) {
+            const modal = document.getElementById('sos-modal');
+            if (show) {
+                modal.classList.remove('translate-y-full', 'opacity-0');
+                renderSOSGrid();
+                
+                // Show medical ID in SOS if data exists
+                const medDisplay = document.getElementById('sos-medical-display');
+                if (medicalProfile.bloodGroup || medicalProfile.allergies) {
+                    medDisplay.classList.remove('hidden');
+                    document.getElementById('sos-display-blood').innerText = medicalProfile.bloodGroup || 'Unknown';
+                    document.getElementById('sos-display-allergies').innerText = medicalProfile.allergies || 'None recorded';
+                } else {
+                    medDisplay.classList.add('hidden');
+                }
+            } else {
+                modal.classList.add('translate-y-full', 'opacity-0');
+            }
+        }
+
+        // --- MEDICAL LOGIC ---
+        function renderMedicalInfo() {
+            document.getElementById('med-blood').value = medicalProfile.bloodGroup || '';
+            document.getElementById('med-allergies').value = medicalProfile.allergies || '';
+            document.getElementById('med-conditions').value = medicalProfile.conditions || '';
+            document.getElementById('med-doctor').value = medicalProfile.doctorName || '';
+            renderMedicines();
+        }
+
+        function saveMedicalBasicInfo() {
+            medicalProfile.bloodGroup = document.getElementById('med-blood').value;
+            medicalProfile.allergies = document.getElementById('med-allergies').value;
+            medicalProfile.conditions = document.getElementById('med-conditions').value;
+            medicalProfile.doctorName = document.getElementById('med-doctor').value;
+            localStorage.setItem('rescueMedical', JSON.stringify(medicalProfile));
+        }
+
+        document.getElementById('med-form').onsubmit = (e) => {
+            e.preventDefault();
+            const name = document.getElementById('med-name').value;
+            const timing = document.getElementById('med-timing').value;
+            if(name && timing) {
+                medicalProfile.medicines.push({name, timing});
+                localStorage.setItem('rescueMedical', JSON.stringify(medicalProfile));
+                renderMedicines();
+                e.target.reset();
+            }
+        };
+
+        function deleteMedicine(index) {
+            medicalProfile.medicines.splice(index, 1);
+            localStorage.setItem('rescueMedical', JSON.stringify(medicalProfile));
+            renderMedicines();
+        }
+
+        function renderMedicines() {
+            const list = document.getElementById('medicine-list');
+            if(medicalProfile.medicines.length === 0) {
+                list.innerHTML = '<p class="text-slate-400 text-sm italic text-center py-4 bg-slate-50 rounded-2xl border border-slate-100">No prescriptions added.</p>';
+                return;
+            }
+            list.innerHTML = medicalProfile.medicines.map((m, i) => `
+                <div class="flex items-center justify-between p-4 bg-slate-50 rounded-2xl shadow-sm border border-slate-100">
+                    <div>
+                        <p class="font-bold text-slate-800">${m.name}</p>
+                        <p class="text-xs text-slate-500 font-medium mt-1"><i class="fa-regular fa-clock mr-1 text-rose-400"></i>${m.timing}</p>
+                    </div>
+                    <button type="button" onclick="deleteMedicine(${i})" class="w-10 h-10 rounded-full bg-white text-slate-400 flex items-center justify-center shadow-sm active:scale-95 transition-transform"><i class="fa-solid fa-trash-can text-sm"></i></button>
+                </div>
+            `).join('');
+        }
+
+        function showRecommendations() {
+            const condition = document.getElementById('med-recommend-select').value;
+            const resultsDiv = document.getElementById('recommendation-results');
+            
+            if (!condition) {
+                resultsDiv.classList.add('hidden');
+                return;
+            }
+
+            const meds = RECOMMENDED_MEDICINES[condition];
+            resultsDiv.innerHTML = meds.map(m => `
+                <div class="p-4 bg-rose-50 rounded-2xl border border-rose-100 flex justify-between items-center">
+                    <div>
+                        <p class="font-bold text-slate-800 text-sm">${m.name}</p>
+                        <p class="text-[10px] font-bold text-rose-500 uppercase tracking-wide mt-1">${m.usage}</p>
+                    </div>
+                    <button onclick="fillMedicineForm('${m.name}')" class="w-8 h-8 rounded-full bg-white text-rose-500 flex items-center justify-center shadow-sm active:scale-95 transition-transform shrink-0 ml-2" title="Add to Prescriptions">
+                        <i class="fa-solid fa-arrow-up"></i>
+                    </button>
+                </div>
+            `).join('');
+            resultsDiv.classList.remove('hidden');
+        }
+
+        function fillMedicineForm(medName) {
+            document.getElementById('med-name').value = medName;
+            document.getElementById('med-timing').focus();
+            document.getElementById('med-form').scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+
+        // --- RENDERERS ---
+        function renderUI() {
+            document.getElementById('standard-numbers').innerHTML = CONTACTS.map(c => `
+                <a href="tel:${c.num}" class="flex items-center p-5 bg-slate-50 rounded-3xl active:scale-[0.98] transition-transform">
+                    <div class="${c.color} w-14 h-14 rounded-2xl flex items-center justify-center text-white text-xl shadow-lg">
+                        <i class="fa-solid ${c.icon}"></i>
+                    </div>
+                    <div class="ml-5 flex-grow">
+                        <p class="font-bold text-lg">${c.name}</p>
+                        <p class="text-xs text-slate-400 font-black uppercase tracking-widest">${c.num}</p>
+                    </div>
+                    <i class="fa-solid fa-chevron-right text-slate-300"></i>
+                </a>
+            `).join('');
+
+            renderLibrary('firstaid', FIRST_AID_DATA, 'aid-categories', 'firstaid-cards');
+            renderLibrary('disaster', DISASTER_DATA, 'disaster-categories', 'disaster-cards');
+        }
+
+        function renderLibrary(type, data, navId, contentId) {
+            const nav = document.getElementById(navId);
+            const content = document.getElementById(contentId);
+
+            nav.innerHTML = data.map((item, idx) => `
+                <button onclick="scrollToElement('${type}-${item.id}', this)" class="category-pill shrink-0 px-6 py-3 rounded-full bg-slate-100 text-slate-500 text-[10px] font-black uppercase tracking-widest ${idx === 0 ? 'active' : ''}">
+                    ${item.id}
+                </button>
+            `).join('');
+
+            content.innerHTML = data.map(item => `
+                <div id="${type}-${item.id}" class="space-y-6">
+                    <div class="relative h-64 rounded-[3rem] overflow-hidden shadow-2xl">
+                        <img src="${item.img}" class="w-full h-full object-cover">
+                        <div class="absolute inset-0 img-overlay"></div>
+                        <div class="absolute bottom-8 left-8">
+                            <h3 class="text-3xl font-black text-white tracking-tighter">${item.title}</h3>
+                        </div>
+                    </div>
+                    <div class="space-y-4">
+                        ${item.steps.map((s, i) => `
+                            <div class="flex items-start gap-5">
+                                <div class="w-8 h-8 rounded-2xl bg-slate-900 text-white flex items-center justify-center text-[10px] font-black shrink-0 mt-1">${i + 1}</div>
+                                <p class="text-slate-600 font-bold leading-relaxed">${s}</p>
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function scrollToElement(id, btn) {
+            const el = document.getElementById(id);
+            el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            const pills = btn.parentElement.querySelectorAll('.category-pill');
+            pills.forEach(p => p.classList.remove('active'));
+            btn.classList.add('active');
+        }
+
+        function renderPersonal() {
+            const list = document.getElementById('personal-list');
+            if (personalContacts.length === 0) {
+                list.innerHTML = `<p class="text-slate-400 text-sm italic text-center py-4">Circle is empty</p>`;
+                return;
+            }
+            list.innerHTML = personalContacts.map((c, idx) => `
+                <div class="flex items-center justify-between p-5 bg-white rounded-3xl shadow-sm">
+                    <div class="flex items-center">
+                        <div class="w-10 h-10 bg-slate-900 text-white rounded-full flex items-center justify-center font-black mr-4">${c.name[0]}</div>
+                        <div>
+                            <p class="font-bold text-slate-900">${c.name}</p>
+                            <p class="text-xs text-slate-400">${c.num}</p>
+                        </div>
+                    </div>
+                    <div class="flex gap-2">
+                        <a href="tel:${c.num}" class="w-10 h-10 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center"><i class="fa-solid fa-phone"></i></a>
+                        <button onclick="deleteContact(${idx})" class="w-10 h-10 rounded-full bg-slate-50 text-slate-300 flex items-center justify-center"><i class="fa-solid fa-trash-can text-sm"></i></button>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function renderSOSGrid() {
+            const grid = document.getElementById('sos-grid');
+            grid.innerHTML = CONTACTS.slice(1).map(c => `
+                <a href="tel:${c.num}" class="block bg-white/10 border border-white/20 p-6 rounded-[2rem] text-center active:scale-95 transition-transform">
+                    <span class="block text-white/50 text-[10px] font-black uppercase tracking-widest mb-1">${c.name}</span>
+                    <span class="block text-white text-3xl font-black">${c.num}</span>
+                </a>
+            `).join('');
+
+            const pList = document.getElementById('sos-personal-list');
+            const pSec = document.getElementById('sos-personal-section');
+            if (personalContacts.length > 0) {
+                pSec.classList.remove('hidden');
+                pList.innerHTML = personalContacts.map(c => `
+                    <a href="tel:${c.num}" class="flex items-center justify-between p-5 bg-white/10 rounded-2xl border border-white/10">
+                        <span class="text-white font-bold">${c.name}</span>
+                        <div class="flex items-center gap-3">
+                            <span class="text-white/40 text-sm font-black">${c.num}</span>
+                            <div class="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center text-white"><i class="fa-solid fa-phone text-xs"></i></div>
+                        </div>
+                    </a>
+                `).join('');
+            }
+        }
+
+        // --- HANDLERS ---
+        function findNearby(type) {
+            if (navigator.geolocation) {
+                navigator.geolocation.getCurrentPosition(pos => {
+                    const lat = pos.coords.latitude;
+                    const lon = pos.coords.longitude;
+                    window.open(`https://www.google.com/maps/search/${type}/@${lat},${lon},15z`, '_blank');
+                }, () => window.open(`https://www.google.com/maps/search/${type}`, '_blank'));
+            } else {
+                window.open(`https://www.google.com/maps/search/${type}`, '_blank');
+            }
+        }
+
+        document.getElementById('contact-form').onsubmit = (e) => {
+            e.preventDefault();
+            const name = document.getElementById('nameInput').value;
+            const num = document.getElementById('numInput').value;
+            personalContacts.push({ name, num });
+            localStorage.setItem('rescueContacts', JSON.stringify(personalContacts));
+            renderPersonal();
+            e.target.reset();
+        };
+
+        function deleteContact(idx) {
+            personalContacts.splice(idx, 1);
+            localStorage.setItem('rescueContacts', JSON.stringify(personalContacts));
+            renderPersonal();
+        }
+
+        // --- INIT ---
+        window.onload = () => {
+            renderUI();
+            renderPersonal();
+            renderMedicalInfo(); // Init Medical data
+        }
+    </script>
+</body>
+</html>
