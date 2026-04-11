@@ -1,7 +1,7 @@
 {
   "schemaVersion": 2,
   "source": "rescuenow-medical-id",
-  "updatedAt": "2026-04-11T12:50:53.943Z",
+  "updatedAt": "2026-04-11T13:28:37.027Z",
   "patient": {
     "bloodGroup": "AB+",
     "allergies": [
@@ -10,7 +10,8 @@
     ],
     "conditions": [
       "Diabetes",
-      "Hypertension"
+      "Hypertension",
+      "Migrane"
     ]
   },
   "emergencyDoctor": {

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { getMedicalProfile, putMedicalProfile } from './medicalApi';
 
 const EMPTY = {
@@ -10,8 +10,73 @@ const EMPTY = {
   medications: []
 };
 
+const CONTACTS = [
+  { name: 'National Emergency', num: '112', color: 'bg-red-600', icon: 'fa-shield-halved' },
+  { name: 'Ambulance', num: '102', color: 'bg-emerald-600', icon: 'fa-truck-medical' },
+  { name: 'Police', num: '100', color: 'bg-blue-600', icon: 'fa-user-shield' },
+  { name: 'Fire Force', num: '101', color: 'bg-orange-600', icon: 'fa-fire' }
+];
+
+const FIRST_AID_DATA = [
+  {
+    id: 'heart', title: 'Cardiac Arrest (CPR)',
+    steps: [ 'Confirm scene safety.', 'Check responsiveness (tap/shout).', 'If unresponsive, call 112 immediately.', 'Start chest compressions: Push hard and fast (100-120/min).', 'Allow full chest recoil between compressions.', 'Continue until help arrives or an AED is used.' ]
+  },
+  {
+    id: 'bleed', title: 'Severe Bleeding',
+    steps: [ 'Apply direct pressure with a clean cloth.', 'Keep constant pressure; do not lift to check.', 'If bleeding persists, apply a tourniquet above the wound.', 'Wrap the victim to prevent shock.', 'Elevate the wound above heart level.' ]
+  },
+  {
+    id: 'choke', title: 'Choking (Heimlich)',
+    steps: [ 'Ask "Are you choking?"', 'Stand behind them, wrap arms around waist.', 'Make a fist, place thumb-side above the navel.', 'Perform quick, upward abdominal thrusts.', 'Repeat until object is expelled or they lose consciousness.' ]
+  },
+  {
+    id: 'burn', title: 'Serious Burns',
+    steps: [ 'Stop the burn (Remove heat/fire).', 'Cool with room-temperature water for 20 mins.', 'Remove jewelry before the area swells.', 'Cover loosely with sterile plastic wrap.', 'Never apply ice, butter, or ointments.' ]
+  },
+  {
+    id: 'stroke', title: 'Stroke (F.A.S.T)',
+    steps: [ 'FACE: Ask them to smile. Does one side droop?', 'ARMS: Ask them to raise both arms. Does one drift down?', 'SPEECH: Ask them to repeat a simple phrase. Is it slurred?', 'TIME: If any signs are present, call 112 immediately.', 'Note the time when symptoms first started.' ]
+  }
+];
+
+const DISASTER_DATA = [
+  {
+    id: 'quake', title: 'Earthquake Survival',
+    steps: [ 'DROP: Get on your hands and knees.', 'COVER: Protect your head/neck under sturdy furniture.', 'HOLD ON: Stay put until the shaking stops.', 'Avoid glass, windows, and heavy objects.', 'If outdoors, move to an open area away from structures.' ]
+  },
+  {
+    id: 'flood', title: 'Flash Flood Safety',
+    steps: [ 'Move to higher ground immediately.', 'Never walk or drive through flood waters.', 'Avoid bridges over fast-moving currents.', 'If trapped in a car, climb onto the roof if water rises.', 'Stay away from downed power lines.' ]
+  },
+  {
+    id: 'fire', title: 'House Fire Protocol',
+    steps: [ 'Get out immediately. Do not stop for items.', 'Crawl low under smoke to find exits.', 'Check doors for heat before opening.', 'Stop, Drop, and Roll if your clothing catches fire.', 'Call 112 only once you are safely outside.' ]
+  },
+  {
+    id: 'storm', title: 'Severe Storm/Cyclone',
+    steps: [ 'Stay indoors in a reinforced room or basement.', 'Keep away from glass windows and doors.', 'Unplug electronic appliances.', 'Have your emergency kit and water ready.', 'Listen to radio/official alerts for updates.' ]
+  }
+];
+
 export default function App() {
-  const [tab, setTab] = useState('medical');
+  const [tab, setTab] = useState('home');
+  const [wikiType, setWikiType] = useState('firstaid');
+  const [activeFirstAid, setActiveFirstAid] = useState(FIRST_AID_DATA[0].id);
+  const [activeDisaster, setActiveDisaster] = useState(DISASTER_DATA[0].id);
+  const [wikiSearch, setWikiSearch] = useState('');
+  const [sosOpen, setSosOpen] = useState(false);
+
+  const [contacts, setContacts] = useState(() => {
+    try {
+      return JSON.parse(localStorage.getItem('rescueContacts') || '[]');
+    } catch {
+      return [];
+    }
+  });
+  const [contactName, setContactName] = useState('');
+  const [contactNumber, setContactNumber] = useState('');
+
   const [profile, setProfile] = useState(EMPTY);
   const [error, setError] = useState('');
   const [medName, setMedName] = useState('');
@@ -22,6 +87,10 @@ export default function App() {
   useEffect(() => {
     getMedicalProfile().then(setProfile);
   }, []);
+
+  useEffect(() => {
+    localStorage.setItem('rescueContacts', JSON.stringify(contacts));
+  }, [contacts]);
 
   const parseList = (value) => value
     .split(/,|\n/)
@@ -102,33 +171,215 @@ export default function App() {
     updateProfile(next);
   };
 
+  const openSOS = () => setSosOpen(true);
+  const closeSOS = () => setSosOpen(false);
+
+  const addContact = (e) => {
+    e.preventDefault();
+    if (!contactName.trim() || !contactNumber.trim()) return;
+    setContacts(prev => [...prev, { name: contactName.trim(), num: contactNumber.trim() }]);
+    setContactName('');
+    setContactNumber('');
+  };
+
+  const removeContact = (idx) => {
+    setContacts(prev => prev.filter((_, i) => i !== idx));
+  };
+
+  const findNearby = (type) => {
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          const { latitude, longitude } = pos.coords;
+          window.open(`https://www.google.com/maps/search/${type}/@${latitude},${longitude},15z`, '_blank');
+        },
+        () => window.open(`https://www.google.com/maps/search/${type}`, '_blank')
+      );
+    } else {
+      window.open(`https://www.google.com/maps/search/${type}`, '_blank');
+    }
+  };
+
+  const filteredFirstAid = useMemo(() => {
+    const q = wikiSearch.trim().toLowerCase();
+    if (!q) return FIRST_AID_DATA;
+    return FIRST_AID_DATA.filter(item => item.id.includes(q) || item.title.toLowerCase().includes(q) || item.steps.some(s => s.toLowerCase().includes(q)));
+  }, [wikiSearch]);
+
+  useEffect(() => {
+    if (filteredFirstAid.length === 0) return;
+    if (!filteredFirstAid.some(item => item.id === activeFirstAid)) {
+      setActiveFirstAid(filteredFirstAid[0].id);
+    }
+  }, [filteredFirstAid, activeFirstAid]);
+
+  const currentFirstAid = filteredFirstAid.find(item => item.id === activeFirstAid);
+  const currentDisaster = DISASTER_DATA.find(item => item.id === activeDisaster);
+
   return (
-    <main className="max-w-md mx-auto min-h-screen pb-24">
-      <header className="px-6 pt-8 pb-4">
-        <h1 className="text-3xl font-black tracking-tight">RescueNow React</h1>
-        <p className="text-slate-500 text-sm font-semibold">Migration started: Medical ID fully React-based</p>
-      </header>
-
-      <section className="px-6">
-        <div className="flex gap-2 mb-4">
-          {['home', 'contacts', 'medical', 'nearby', 'wiki'].map((id) => (
-            <button
-              key={id}
-              onClick={() => setTab(id)}
-              className={`px-3 py-2 rounded-xl text-xs font-black uppercase tracking-wider ${tab === id ? 'bg-red-500 text-white' : 'bg-slate-100 text-slate-500'}`}
-            >
-              {id}
+    <main className="max-w-md mx-auto min-h-screen pb-24 bg-slate-50">
+      {sosOpen && (
+        <div className="fixed inset-0 z-50 bg-black/95 text-white p-6 overflow-y-auto">
+          <div className="flex items-center justify-between mb-6">
+            <h2 className="text-2xl font-black tracking-tight">Emergency Broadcast</h2>
+            <button onClick={closeSOS} className="w-10 h-10 rounded-full bg-white/20">
+              <i className="fa-solid fa-xmark" />
             </button>
-          ))}
-        </div>
-
-        {tab !== 'medical' && (
-          <div className="bg-white rounded-3xl p-6 shadow text-slate-600 font-semibold">
-            This tab will be migrated next. Medical ID is now React + JSON API.
           </div>
-        )}
+          <a href="tel:112" className="block w-full text-center bg-white text-red-600 rounded-3xl py-8 font-black text-5xl mb-4">112</a>
+          <div className="grid grid-cols-2 gap-3 mb-4">
+            {CONTACTS.slice(1).map(c => (
+              <a key={c.num} href={`tel:${c.num}`} className="bg-white/10 border border-white/20 rounded-2xl p-4 text-center">
+                <p className="text-xs text-white/60 font-black uppercase tracking-widest">{c.name}</p>
+                <p className="text-2xl font-black">{c.num}</p>
+              </a>
+            ))}
+          </div>
+          {(profile.patient.bloodGroup || profile.patient.allergies.length > 0) && (
+            <div className="bg-white/10 border border-white/20 rounded-2xl p-4 mb-4">
+              <p className="text-xs uppercase tracking-widest text-white/60 font-black mb-2">Medical ID</p>
+              <p><span className="font-bold">Blood Group:</span> {profile.patient.bloodGroup || 'Unknown'}</p>
+              <p><span className="font-bold">Allergies:</span> {profile.patient.allergies.join(', ') || 'None recorded'}</p>
+            </div>
+          )}
+          {contacts.length > 0 && (
+            <div className="space-y-2">
+              {contacts.map((c, idx) => (
+                <a key={`${c.name}-${idx}`} href={`tel:${c.num}`} className="flex items-center justify-between bg-white/10 rounded-xl p-3">
+                  <span className="font-bold">{c.name}</span>
+                  <span className="text-white/70 text-sm">{c.num}</span>
+                </a>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
-        {tab === 'medical' && (
+      {tab === 'home' && (
+        <section className="p-6 space-y-4">
+          <div className="text-center pt-6">
+            <h1 className="text-4xl font-black tracking-tight">RescueNow</h1>
+            <p className="text-slate-500 text-xs uppercase tracking-widest font-bold mt-1">Ready for anything</p>
+          </div>
+          <div className="flex justify-center py-6">
+            <button onClick={openSOS} className="relative w-40 h-40 rounded-full bg-red-600 text-white text-5xl font-black shadow-2xl">
+              <span className="absolute inset-0 rounded-full animate-ping bg-red-500 opacity-30" />
+              <span className="relative">SOS</span>
+            </button>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <button onClick={() => setTab('contacts')} className="p-5 bg-white rounded-3xl shadow text-left font-bold">Phone Circle</button>
+            <button onClick={() => setTab('nearby')} className="p-5 bg-white rounded-3xl shadow text-left font-bold">Find Help</button>
+          </div>
+          <button onClick={() => setTab('medical')} className="w-full p-5 bg-white rounded-3xl shadow text-left font-bold">Medical Profile</button>
+          <button onClick={() => setTab('wiki')} className="w-full p-5 bg-gradient-to-r from-red-600 to-red-400 text-white rounded-3xl shadow text-left font-bold">First Aid Wiki</button>
+        </section>
+      )}
+
+      {tab === 'contacts' && (
+        <section className="p-6 space-y-4">
+          <h2 className="text-3xl font-black tracking-tight">Phone Circle</h2>
+          <div className="space-y-2">
+            {CONTACTS.map(c => (
+              <a key={c.num} href={`tel:${c.num}`} className="flex items-center p-4 bg-white rounded-2xl shadow-sm">
+                <div className={`${c.color} w-12 h-12 rounded-2xl text-white flex items-center justify-center`}><i className={`fa-solid ${c.icon}`} /></div>
+                <div className="ml-4">
+                  <p className="font-bold">{c.name}</p>
+                  <p className="text-xs text-slate-500 font-black tracking-widest">{c.num}</p>
+                </div>
+              </a>
+            ))}
+          </div>
+          <div className="bg-white rounded-3xl p-5 shadow space-y-3">
+            <h3 className="text-xs uppercase tracking-widest font-black text-slate-400">Trusted Contacts</h3>
+            {contacts.map((c, i) => (
+              <div key={`${c.name}-${i}`} className="flex items-center justify-between p-3 bg-slate-50 rounded-2xl">
+                <div>
+                  <p className="font-bold">{c.name}</p>
+                  <p className="text-xs text-slate-500">{c.num}</p>
+                </div>
+                <div className="flex gap-2">
+                  <a href={`tel:${c.num}`} className="w-9 h-9 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center"><i className="fa-solid fa-phone" /></a>
+                  <button type="button" onClick={() => removeContact(i)} className="w-9 h-9 rounded-full bg-slate-200 text-slate-500"><i className="fa-solid fa-trash-can" /></button>
+                </div>
+              </div>
+            ))}
+            <form onSubmit={addContact} className="space-y-2">
+              <input value={contactName} onChange={(e) => setContactName(e.target.value)} placeholder="Name" className="w-full bg-slate-50 p-3 rounded-2xl font-semibold" />
+              <input value={contactNumber} onChange={(e) => setContactNumber(e.target.value)} placeholder="Number" className="w-full bg-slate-50 p-3 rounded-2xl font-semibold" />
+              <button className="w-full bg-slate-900 text-white p-3 rounded-2xl font-bold">Add to Circle</button>
+            </form>
+          </div>
+        </section>
+      )}
+
+      {tab === 'nearby' && (
+        <section className="p-6 space-y-3">
+          <h2 className="text-3xl font-black tracking-tight">Locator</h2>
+          <p className="text-slate-500 font-semibold">Find verified facilities nearby.</p>
+          <button onClick={() => findNearby('hospital')} className="w-full p-5 bg-white rounded-3xl shadow text-left font-bold">Hospitals</button>
+          <button onClick={() => findNearby('police station')} className="w-full p-5 bg-white rounded-3xl shadow text-left font-bold">Police</button>
+          <button onClick={() => findNearby('fire station')} className="w-full p-5 bg-white rounded-3xl shadow text-left font-bold">Fire Brigade</button>
+          <button onClick={() => findNearby('pharmacy')} className="w-full p-5 bg-white rounded-3xl shadow text-left font-bold">Pharmacies</button>
+        </section>
+      )}
+
+      {tab === 'wiki' && (
+        <section className="p-6 space-y-4">
+          <h2 className="text-3xl font-black tracking-tight">Wiki</h2>
+          <div className="flex gap-2">
+            <button onClick={() => setWikiType('firstaid')} className={`px-4 py-2 rounded-xl text-xs font-black uppercase ${wikiType === 'firstaid' ? 'bg-red-500 text-white' : 'bg-slate-100 text-slate-500'}`}>First Aid</button>
+            <button onClick={() => setWikiType('disaster')} className={`px-4 py-2 rounded-xl text-xs font-black uppercase ${wikiType === 'disaster' ? 'bg-red-500 text-white' : 'bg-slate-100 text-slate-500'}`}>Disaster</button>
+          </div>
+
+          {wikiType === 'firstaid' && (
+            <>
+              <input value={wikiSearch} onChange={(e) => setWikiSearch(e.target.value)} placeholder="Search conditions..." className="w-full bg-white p-3 rounded-2xl shadow-sm font-semibold" />
+              <div className="flex gap-2 overflow-x-auto">
+                {filteredFirstAid.map(item => (
+                  <button key={item.id} onClick={() => setActiveFirstAid(item.id)} className={`px-4 py-2 rounded-full text-xs font-black uppercase ${activeFirstAid === item.id ? 'bg-red-500 text-white' : 'bg-slate-200 text-slate-600'}`}>{item.id}</button>
+                ))}
+              </div>
+              {!currentFirstAid && <p className="text-slate-400 italic">No matching conditions.</p>}
+              {currentFirstAid && (
+                <div className="bg-white rounded-3xl p-5 shadow space-y-3">
+                  <h3 className="text-2xl font-black tracking-tight">{currentFirstAid.title}</h3>
+                  {currentFirstAid.steps.map((s, i) => (
+                    <div key={i} className="flex gap-3 items-start">
+                      <div className="w-7 h-7 rounded-xl bg-slate-900 text-white text-xs font-black flex items-center justify-center shrink-0 mt-1">{i + 1}</div>
+                      <p className="font-semibold text-slate-700">{s}</p>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </>
+          )}
+
+          {wikiType === 'disaster' && (
+            <>
+              <div className="flex gap-2 overflow-x-auto">
+                {DISASTER_DATA.map(item => (
+                  <button key={item.id} onClick={() => setActiveDisaster(item.id)} className={`px-4 py-2 rounded-full text-xs font-black uppercase ${activeDisaster === item.id ? 'bg-red-500 text-white' : 'bg-slate-200 text-slate-600'}`}>{item.id}</button>
+                ))}
+              </div>
+              {currentDisaster && (
+                <div className="bg-white rounded-3xl p-5 shadow space-y-3">
+                  <h3 className="text-2xl font-black tracking-tight">{currentDisaster.title}</h3>
+                  {currentDisaster.steps.map((s, i) => (
+                    <div key={i} className="flex gap-3 items-start">
+                      <div className="w-7 h-7 rounded-xl bg-slate-900 text-white text-xs font-black flex items-center justify-center shrink-0 mt-1">{i + 1}</div>
+                      <p className="font-semibold text-slate-700">{s}</p>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </>
+          )}
+        </section>
+      )}
+
+      {tab === 'medical' && (
+        <section className="px-6 py-6">
           <div className="space-y-4">
             <div className="bg-white rounded-3xl p-6 shadow">
               <h2 className="font-black text-rose-500 text-xs uppercase tracking-[0.2em] mb-4">Vital Info</h2>
@@ -261,8 +512,25 @@ export default function App() {
               {error && <p className="text-xs font-semibold text-red-500 mt-1">{error}</p>}
             </div>
           </div>
-        )}
-      </section>
+        </section>
+      )}
+
+      <nav className="fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur border-t border-slate-200 z-40">
+        <div className="max-w-md mx-auto flex justify-around py-3">
+          {[
+            { id: 'home', icon: 'fa-house-chimney-crack', label: 'Home' },
+            { id: 'contacts', icon: 'fa-phone-volume', label: 'Circle' },
+            { id: 'medical', icon: 'fa-notes-medical', label: 'Medical' },
+            { id: 'nearby', icon: 'fa-location-arrow', label: 'Maps' },
+            { id: 'wiki', icon: 'fa-briefcase-medical', label: 'Wiki' }
+          ].map(item => (
+            <button key={item.id} onClick={() => setTab(item.id)} className={`flex flex-col items-center gap-1 ${tab === item.id ? 'text-red-600' : 'text-slate-400'}`}>
+              <i className={`fa-solid ${item.icon}`} />
+              <span className="text-[9px] font-black uppercase tracking-widest">{item.label}</span>
+            </button>
+          ))}
+        </div>
+      </nav>
     </main>
   );
 }
