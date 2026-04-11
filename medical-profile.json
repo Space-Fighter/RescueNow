@@ -1,0 +1,25 @@
+{
+  "schemaVersion": 2,
+  "source": "rescuenow-medical-id",
+  "updatedAt": "2026-04-11T12:50:53.943Z",
+  "patient": {
+    "bloodGroup": "AB+",
+    "allergies": [
+      "Peanuts",
+      "Milk"
+    ],
+    "conditions": [
+      "Diabetes",
+      "Hypertension"
+    ]
+  },
+  "emergencyDoctor": {
+    "raw": "Dr Sharma -  9149385766"
+  },
+  "medications": [
+    {
+      "name": "Inhaler",
+      "timing": "As needed"
+    }
+  ]
+}

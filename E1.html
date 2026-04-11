@@ -261,29 +261,6 @@
                      </form>
                 </div>
 
-                <!-- Common Medicine Reference -->
-                <div class="bg-white rounded-[2.5rem] p-6 shadow-xl shadow-slate-200/50">
-                     <h3 class="font-black text-rose-500 text-xs uppercase tracking-[0.2em] mb-2">General Recommendations</h3>
-                     <p class="text-xs text-slate-400 mb-4 font-medium leading-relaxed">Common generic medicines for general conditions. <strong class="text-rose-400">Always consult a doctor before use.</strong></p>
-                     
-                     <div class="relative mb-4">
-                         <select id="med-recommend-select" onchange="showRecommendations()" class="w-full bg-slate-50 p-4 rounded-2xl border-none font-bold text-slate-800 outline-none focus:ring-2 focus:ring-rose-500 appearance-none">
-                             <option value="">Select a condition...</option>
-                             <option value="flu">Flu & Common Cold</option>
-                             <option value="fever">Fever & Body Ache</option>
-                             <option value="acidity">Acidity & Heartburn</option>
-                             <option value="diabetes">Diabetes (Type 2)</option>
-                             <option value="bp">High Blood Pressure</option>
-                             <option value="allergy">Mild Allergies</option>
-                         </select>
-                         <i class="fa-solid fa-chevron-down absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 text-sm pointer-events-none"></i>
-                     </div>
-                     
-                     <div id="recommendation-results" class="hidden space-y-3">
-                         <!-- Results populated by JS -->
-                     </div>
-                </div>
-
             </div>
             <div class="h-10"></div> <!-- Bottom padding -->
         </section>
@@ -348,6 +325,10 @@
         <section id="tab-firstaid" class="tab-content hide-scrollbar">
             <div class="sticky top-0 bg-white/95 backdrop-blur-md px-6 py-6 border-b z-30">
                 <h2 class="text-2xl font-black tracking-tight mb-4">First Aid Library</h2>
+                <div class="relative mb-3">
+                    <input type="text" id="wiki-search" oninput="filterFirstAidWiki()" placeholder="Search conditions..." class="w-full bg-slate-50 p-3 pl-10 rounded-2xl border-none text-sm font-semibold text-slate-700 focus:ring-2 focus:ring-red-500 outline-none">
+                    <i class="fa-solid fa-magnifying-glass absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
+                </div>
                 <div class="flex gap-2 overflow-x-auto hide-scrollbar" id="aid-categories"></div>
             </div>
             <div id="firstaid-cards" class="px-6 py-8 space-y-12"></div>
@@ -409,7 +390,7 @@
                 steps: [ 'Apply direct pressure with a clean cloth.', 'Keep constant pressure; do not lift to check.', 'If bleeding persists, apply a tourniquet above the wound.', 'Wrap the victim to prevent shock.', 'Elevate the wound above heart level.' ]
             },
             {
-                id: 'choke', title: 'Choking (Heimlich)', img: 'https://images.unsplash.com/photo-1559839734-2b71f1e59816?auto=format&fit=crop&w=800&q=80',
+                id: 'choke', title: 'Choking (Heimlich)', img: 'https://images.unsplash.com/photo-1584515933487-779824d29309?auto=format&fit=crop&w=800&q=80',
                 steps: [ 'Ask "Are you choking?"', 'Stand behind them, wrap arms around waist.', 'Make a fist, place thumb-side above the navel.', 'Perform quick, upward abdominal thrusts.', 'Repeat until object is expelled or they lose consciousness.' ]
             },
             {
@@ -442,37 +423,133 @@
         ];
 
         let personalContacts = JSON.parse(localStorage.getItem('rescueContacts') || '[]');
-        let medicalProfile = JSON.parse(localStorage.getItem('rescueMedical')) || {
-            bloodGroup: '', allergies: '', conditions: '', doctorName: '', medicines: []
-        };
+        const MEDICAL_PROFILE_FILE = 'medical-profile.json';
+        const MEDICAL_PROFILE_API = '/api/medical-profile';
 
-        const RECOMMENDED_MEDICINES = {
-            'flu': [
-                { name: 'Paracetamol (500mg)', usage: 'For fever & mild pain' },
-                { name: 'Cetirizine (10mg)', usage: 'For runny nose/allergies' },
-                { name: 'Dextromethorphan', usage: 'For dry cough relief' }
-            ],
-            'fever': [
-                { name: 'Ibuprofen (400mg)', usage: 'For inflammation and pain' },
-                { name: 'Acetaminophen (500mg)', usage: 'For fever reduction' }
-            ],
-            'acidity': [
-                { name: 'Pantoprazole (40mg)', usage: 'For severe acid reflux (empty stomach)' },
-                { name: 'Antacid Gel (e.g., Digene)', usage: 'Immediate heartburn relief' }
-            ],
-            'diabetes': [
-                { name: 'Metformin', usage: 'First-line medication (Prescription only)' },
-                { name: 'Glimepiride', usage: 'To lower blood sugar (Prescription only)' }
-            ],
-            'bp': [
-                { name: 'Amlodipine (5mg)', usage: 'Calcium channel blocker (Prescription only)' },
-                { name: 'Losartan (50mg)', usage: 'Angiotensin receptor blocker (Prescription only)' }
-            ],
-            'allergy': [
-                { name: 'Loratadine (10mg)', usage: 'Non-drowsy antihistamine' },
-                { name: 'Diphenhydramine', usage: 'For severe reactions (may cause drowsiness)' }
-            ]
-        };
+        const MEDICAL_SCHEMA_VERSION = 2;
+
+        function createEmptyMedicalProfile() {
+            return {
+                schemaVersion: MEDICAL_SCHEMA_VERSION,
+                source: 'rescuenow-medical-id',
+                updatedAt: '',
+                patient: {
+                    bloodGroup: '',
+                    allergies: [],
+                    conditions: []
+                },
+                emergencyDoctor: {
+                    raw: ''
+                },
+                medications: []
+            };
+        }
+
+        function normalizeTextList(value) {
+            if (Array.isArray(value)) {
+                return value
+                    .map(v => String(v || '').trim())
+                    .filter(Boolean);
+            }
+            return String(value || '')
+                .split(',')
+                .map(v => v.trim())
+                .filter(Boolean);
+        }
+
+        function migrateMedicalProfile(raw) {
+            if (!raw || typeof raw !== 'object') {
+                return createEmptyMedicalProfile();
+            }
+
+            if (raw.schemaVersion === MEDICAL_SCHEMA_VERSION && raw.patient && Array.isArray(raw.medications)) {
+                return {
+                    schemaVersion: MEDICAL_SCHEMA_VERSION,
+                    source: raw.source || 'rescuenow-medical-id',
+                    updatedAt: raw.updatedAt || '',
+                    patient: {
+                        bloodGroup: raw.patient.bloodGroup || '',
+                        allergies: normalizeTextList(raw.patient.allergies),
+                        conditions: normalizeTextList(raw.patient.conditions)
+                    },
+                    emergencyDoctor: {
+                        raw: (raw.emergencyDoctor && raw.emergencyDoctor.raw) ? String(raw.emergencyDoctor.raw).trim() : ''
+                    },
+                    medications: raw.medications.map(m => ({
+                        name: String(m.name || '').trim(),
+                        timing: String(m.timing || '').trim()
+                    })).filter(m => m.name && m.timing)
+                };
+            }
+
+            // Legacy v1 migration support.
+            return {
+                schemaVersion: MEDICAL_SCHEMA_VERSION,
+                source: 'rescuenow-medical-id',
+                updatedAt: '',
+                patient: {
+                    bloodGroup: raw.bloodGroup || '',
+                    allergies: normalizeTextList(raw.allergies),
+                    conditions: normalizeTextList(raw.conditions)
+                },
+                emergencyDoctor: {
+                    raw: String(raw.doctorName || '').trim()
+                },
+                medications: (Array.isArray(raw.medicines) ? raw.medicines : []).map(m => ({
+                    name: String(m.name || '').trim(),
+                    timing: String(m.timing || '').trim()
+                })).filter(m => m.name && m.timing)
+            };
+        }
+
+        async function saveMedicalProfile() {
+            medicalProfile.updatedAt = new Date().toISOString();
+            try {
+                await fetch(MEDICAL_PROFILE_API, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(medicalProfile)
+                });
+            } catch (err) {
+                // If API is unavailable, keep app functional in memory.
+            }
+        }
+
+        async function loadMedicalProfileFromFile() {
+            try {
+                let res = await fetch(`${MEDICAL_PROFILE_API}?v=${Date.now()}`);
+                if (!res.ok) {
+                    res = await fetch(`${MEDICAL_PROFILE_FILE}?v=${Date.now()}`);
+                }
+                if (!res.ok) {
+                    medicalProfile = createEmptyMedicalProfile();
+                    return;
+                }
+                const json = await res.json();
+                medicalProfile = migrateMedicalProfile(json);
+            } catch (err) {
+                medicalProfile = createEmptyMedicalProfile();
+            }
+        }
+
+        // API-ready payload builder for ChatGPT/OpenAI Chat Completions style messages.
+        function buildMedicalPayloadForChatGPT() {
+            return {
+                modelHint: 'gpt-4.1-mini',
+                messages: [
+                    {
+                        role: 'system',
+                        content: 'You are a medical assistant. Use the provided medical profile as context, but do not replace clinical judgment.'
+                    },
+                    {
+                        role: 'user',
+                        content: `Medical profile JSON:\n${JSON.stringify(medicalProfile, null, 2)}\n\nUse this profile while answering the user query.`
+                    }
+                ]
+            };
+        }
+
+        let medicalProfile = createEmptyMedicalProfile();
 
         // --- NAVIGATION ---
         function switchTab(tabId) {
@@ -496,10 +573,12 @@
                 
                 // Show medical ID in SOS if data exists
                 const medDisplay = document.getElementById('sos-medical-display');
-                if (medicalProfile.bloodGroup || medicalProfile.allergies) {
+                const bloodGroup = medicalProfile.patient.bloodGroup || '';
+                const allergyText = medicalProfile.patient.allergies.join(', ');
+                if (bloodGroup || allergyText) {
                     medDisplay.classList.remove('hidden');
-                    document.getElementById('sos-display-blood').innerText = medicalProfile.bloodGroup || 'Unknown';
-                    document.getElementById('sos-display-allergies').innerText = medicalProfile.allergies || 'None recorded';
+                    document.getElementById('sos-display-blood').innerText = bloodGroup || 'Unknown';
+                    document.getElementById('sos-display-allergies').innerText = allergyText || 'None recorded';
                 } else {
                     medDisplay.classList.add('hidden');
                 }
@@ -510,19 +589,19 @@
 
         // --- MEDICAL LOGIC ---
         function renderMedicalInfo() {
-            document.getElementById('med-blood').value = medicalProfile.bloodGroup || '';
-            document.getElementById('med-allergies').value = medicalProfile.allergies || '';
-            document.getElementById('med-conditions').value = medicalProfile.conditions || '';
-            document.getElementById('med-doctor').value = medicalProfile.doctorName || '';
+            document.getElementById('med-blood').value = medicalProfile.patient.bloodGroup || '';
+            document.getElementById('med-allergies').value = medicalProfile.patient.allergies.join(', ');
+            document.getElementById('med-conditions').value = medicalProfile.patient.conditions.join(', ');
+            document.getElementById('med-doctor').value = medicalProfile.emergencyDoctor.raw || '';
             renderMedicines();
         }
 
         function saveMedicalBasicInfo() {
-            medicalProfile.bloodGroup = document.getElementById('med-blood').value;
-            medicalProfile.allergies = document.getElementById('med-allergies').value;
-            medicalProfile.conditions = document.getElementById('med-conditions').value;
-            medicalProfile.doctorName = document.getElementById('med-doctor').value;
-            localStorage.setItem('rescueMedical', JSON.stringify(medicalProfile));
+            medicalProfile.patient.bloodGroup = document.getElementById('med-blood').value;
+            medicalProfile.patient.allergies = normalizeTextList(document.getElementById('med-allergies').value);
+            medicalProfile.patient.conditions = normalizeTextList(document.getElementById('med-conditions').value);
+            medicalProfile.emergencyDoctor.raw = document.getElementById('med-doctor').value.trim();
+            saveMedicalProfile();
         }
 
         document.getElementById('med-form').onsubmit = (e) => {
@@ -530,26 +609,26 @@
             const name = document.getElementById('med-name').value;
             const timing = document.getElementById('med-timing').value;
             if(name && timing) {
-                medicalProfile.medicines.push({name, timing});
-                localStorage.setItem('rescueMedical', JSON.stringify(medicalProfile));
+                medicalProfile.medications.push({name: name.trim(), timing: timing.trim()});
+                saveMedicalProfile();
                 renderMedicines();
                 e.target.reset();
             }
         };
 
         function deleteMedicine(index) {
-            medicalProfile.medicines.splice(index, 1);
-            localStorage.setItem('rescueMedical', JSON.stringify(medicalProfile));
+            medicalProfile.medications.splice(index, 1);
+            saveMedicalProfile();
             renderMedicines();
         }
 
         function renderMedicines() {
             const list = document.getElementById('medicine-list');
-            if(medicalProfile.medicines.length === 0) {
+            if(medicalProfile.medications.length === 0) {
                 list.innerHTML = '<p class="text-slate-400 text-sm italic text-center py-4 bg-slate-50 rounded-2xl border border-slate-100">No prescriptions added.</p>';
                 return;
             }
-            list.innerHTML = medicalProfile.medicines.map((m, i) => `
+            list.innerHTML = medicalProfile.medications.map((m, i) => `
                 <div class="flex items-center justify-between p-4 bg-slate-50 rounded-2xl shadow-sm border border-slate-100">
                     <div>
                         <p class="font-bold text-slate-800">${m.name}</p>
@@ -558,36 +637,6 @@
                     <button type="button" onclick="deleteMedicine(${i})" class="w-10 h-10 rounded-full bg-white text-slate-400 flex items-center justify-center shadow-sm active:scale-95 transition-transform"><i class="fa-solid fa-trash-can text-sm"></i></button>
                 </div>
             `).join('');
-        }
-
-        function showRecommendations() {
-            const condition = document.getElementById('med-recommend-select').value;
-            const resultsDiv = document.getElementById('recommendation-results');
-            
-            if (!condition) {
-                resultsDiv.classList.add('hidden');
-                return;
-            }
-
-            const meds = RECOMMENDED_MEDICINES[condition];
-            resultsDiv.innerHTML = meds.map(m => `
-                <div class="p-4 bg-rose-50 rounded-2xl border border-rose-100 flex justify-between items-center">
-                    <div>
-                        <p class="font-bold text-slate-800 text-sm">${m.name}</p>
-                        <p class="text-[10px] font-bold text-rose-500 uppercase tracking-wide mt-1">${m.usage}</p>
-                    </div>
-                    <button onclick="fillMedicineForm('${m.name}')" class="w-8 h-8 rounded-full bg-white text-rose-500 flex items-center justify-center shadow-sm active:scale-95 transition-transform shrink-0 ml-2" title="Add to Prescriptions">
-                        <i class="fa-solid fa-arrow-up"></i>
-                    </button>
-                </div>
-            `).join('');
-            resultsDiv.classList.remove('hidden');
-        }
-
-        function fillMedicineForm(medName) {
-            document.getElementById('med-name').value = medName;
-            document.getElementById('med-timing').focus();
-            document.getElementById('med-form').scrollIntoView({ behavior: 'smooth', block: 'center' });
         }
 
         // --- RENDERERS ---
@@ -614,13 +663,13 @@
             const content = document.getElementById(contentId);
 
             nav.innerHTML = data.map((item, idx) => `
-                <button onclick="scrollToElement('${type}-${item.id}', this)" class="category-pill shrink-0 px-6 py-3 rounded-full bg-slate-100 text-slate-500 text-[10px] font-black uppercase tracking-widest ${idx === 0 ? 'active' : ''}">
+                <button data-wiki-id="${item.id}" onclick="openWiki('${type}', '${item.id}', this)" class="category-pill shrink-0 px-6 py-3 rounded-full bg-slate-100 text-slate-500 text-[10px] font-black uppercase tracking-widest ${idx === 0 ? 'active' : ''}">
                     ${item.id}
                 </button>
             `).join('');
 
             content.innerHTML = data.map(item => `
-                <div id="${type}-${item.id}" class="space-y-6">
+                <div id="${type}-${item.id}" class="space-y-6 ${item.id !== data[0].id ? 'hidden' : ''}">
                     <div class="relative h-64 rounded-[3rem] overflow-hidden shadow-2xl">
                         <img src="${item.img}" class="w-full h-full object-cover">
                         <div class="absolute inset-0 img-overlay"></div>
@@ -640,12 +689,65 @@
             `).join('');
         }
 
-        function scrollToElement(id, btn) {
-            const el = document.getElementById(id);
-            el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        function openWiki(type, id, btn) {
+            const cardsContainer = document.getElementById(`${type}-cards`);
+            if (!cardsContainer) return;
+
+            const cards = cardsContainer.querySelectorAll(`[id^="${type}-"]`);
+            cards.forEach(card => card.classList.add('hidden'));
+
+            const el = document.getElementById(`${type}-${id}`);
+            if (el) {
+                el.classList.remove('hidden');
+            }
+
             const pills = btn.parentElement.querySelectorAll('.category-pill');
             pills.forEach(p => p.classList.remove('active'));
             btn.classList.add('active');
+        }
+
+        function filterFirstAidWiki() {
+            const input = document.getElementById('wiki-search');
+            const nav = document.getElementById('aid-categories');
+            const cardsContainer = document.getElementById('firstaid-cards');
+            if (!input || !nav || !cardsContainer) return;
+
+            const query = input.value.trim().toLowerCase();
+            const pills = nav.querySelectorAll('.category-pill');
+
+            if (!query) {
+                pills.forEach(pill => pill.classList.remove('hidden'));
+                const activePill = nav.querySelector('.category-pill.active') || nav.querySelector('.category-pill');
+                if (activePill) {
+                    openWiki('firstaid', activePill.dataset.wikiId, activePill);
+                }
+                return;
+            }
+
+            const matchedIds = FIRST_AID_DATA
+                .filter(item => {
+                    const inId = item.id.toLowerCase().includes(query);
+                    const inTitle = item.title.toLowerCase().includes(query);
+                    const inSteps = item.steps.some(step => step.toLowerCase().includes(query));
+                    return inId || inTitle || inSteps;
+                })
+                .map(item => item.id);
+
+            pills.forEach(pill => {
+                pill.classList.toggle('hidden', !matchedIds.includes(pill.dataset.wikiId));
+            });
+
+            if (matchedIds.length > 0) {
+                const firstMatchPill = nav.querySelector(`.category-pill[data-wiki-id="${matchedIds[0]}"]`);
+                if (firstMatchPill) {
+                    openWiki('firstaid', matchedIds[0], firstMatchPill);
+                }
+                return;
+            }
+
+            const cards = cardsContainer.querySelectorAll('[id^="firstaid-"]');
+            cards.forEach(card => card.classList.add('hidden'));
+            pills.forEach(pill => pill.classList.remove('active'));
         }
 
         function renderPersonal() {
@@ -726,7 +828,8 @@
         }
 
         // --- INIT ---
-        window.onload = () => {
+        window.onload = async () => {
+            await loadMedicalProfileFromFile();
             renderUI();
             renderPersonal();
             renderMedicalInfo(); // Init Medical data
