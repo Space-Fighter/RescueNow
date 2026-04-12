@@ -65,6 +65,119 @@ def parse_iso_date(value: str):
         return None
 
 
+def _parse_date_token(token: str):
+    token = token.strip()
+
+    # 2026-04-12
+    m = re.search(r"\b(\d{4})[-/](\d{1,2})[-/](\d{1,2})\b", token)
+    if m:
+        y, mo, d = int(m.group(1)), int(m.group(2)), int(m.group(3))
+        try:
+            return datetime(y, mo, d)
+        except ValueError:
+            return None
+
+    # 12/04/2026 or 12-04-26 (assume day-first first, then month-first fallback)
+    m = re.search(r"\b(\d{1,2})[-/](\d{1,2})[-/](\d{2,4})\b", token)
+    if m:
+        a, b, y = int(m.group(1)), int(m.group(2)), int(m.group(3))
+        if y < 100:
+            y += 2000
+        for d, mo in ((a, b), (b, a)):
+            try:
+                return datetime(y, mo, d)
+            except ValueError:
+                continue
+
+    # 12 Apr 2026 / 12 April 2026
+    for fmt in ("%d %b %Y", "%d %B %Y", "%b %d %Y", "%B %d %Y", "%d %b, %Y", "%d %B, %Y", "%b %d, %Y", "%B %d, %Y"):
+        try:
+            return datetime.strptime(token, fmt)
+        except ValueError:
+            continue
+
+    return None
+
+
+def _find_dates_in_line(line: str):
+    patterns = [
+        r"\b\d{4}[-/]\d{1,2}[-/]\d{1,2}\b",
+        r"\b\d{1,2}[-/]\d{1,2}[-/]\d{2,4}\b",
+        r"\b\d{1,2}\s+[A-Za-z]{3,9},?\s+\d{4}\b",
+        r"\b[A-Za-z]{3,9}\s+\d{1,2},?\s+\d{4}\b",
+    ]
+
+    dates = []
+    for pattern in patterns:
+        for token in re.findall(pattern, line):
+            parsed = _parse_date_token(token)
+            if parsed:
+                dates.append(parsed)
+    return dates
+
+
+def extract_report_date(text: str, title: str, uploaded_at: str) -> str:
+    # Prefer lines that likely refer to report timestamps.
+    priority_keywords = [
+        "report date",
+        "reported on",
+        "report generated",
+        "reporting date",
+        "date of report",
+        "collection date",
+        "sample collected",
+        "collected on",
+        "collected",
+        "specimen collected",
+        "test date",
+        "registered on",
+        "drawn on",
+    ]
+
+    lines = [line.strip() for line in (text or "").splitlines() if line.strip()]
+
+    priority_candidates = []
+    generic_candidates = []
+    all_candidates = []
+
+    for line in lines:
+        found_dates = _find_dates_in_line(line)
+        if not found_dates:
+            continue
+        all_candidates.extend(found_dates)
+
+        lowered = line.lower()
+        if any(keyword in lowered for keyword in priority_keywords):
+            priority_candidates.extend(found_dates)
+        elif "date" in lowered:
+            generic_candidates.extend(found_dates)
+
+    title_candidates = _find_dates_in_line(title or "")
+    all_candidates.extend(title_candidates)
+
+    now = datetime.now()
+    plausible_recent = [d for d in all_candidates if 2015 <= d.year <= (now.year + 1)]
+
+    chosen = None
+    if priority_candidates:
+        chosen = max(priority_candidates)
+    elif generic_candidates:
+        chosen = max(generic_candidates)
+    elif plausible_recent:
+        chosen = max(plausible_recent)
+    elif title_candidates:
+        chosen = max(title_candidates)
+
+    if chosen:
+        return chosen.strftime("%Y-%m-%d")
+
+    uploaded_dt = parse_iso_date(uploaded_at)
+    if uploaded_dt:
+        return uploaded_dt.strftime("%Y-%m-%d")
+
+    return ""
+
+
 def _extract_with_llamaparse(file_path: Path) -> str:
     # LlamaParse is optional at runtime but preferred for PDF ingestion.
     from llama_parse import LlamaParse  # type: ignore
@@ -210,11 +323,12 @@ def ingest_lab_report(
         ]
     )
 
+    report_date = extract_report_date(combined_text, title or file_name, uploaded_at)
     measurements = parse_measurements_from_text(combined_text)
 
     return LabReportIngestion(
         report_title=title or file_name,
-        report_date=uploaded_at,
+        report_date=report_date,
         source_file=file_path,
         parser_used=parser_used,
         measurements=measurements,
@@ -259,12 +373,13 @@ def build_test_records(profile_path: Path, files_root: Path):
             {
                 "id": str(record.get("id", "")),
                 "title": ingestion.report_title,
+                "reportDate": ingestion.report_date,
                 "uploadedAt": uploaded_at,
                 "tags": tags,
                 "metrics": metrics,
                 "parserUsed": ingestion.parser_used,
                 "structuredMeasurements": [m.model_dump() for m in ingestion.measurements],
-                "sortDate": date_obj.isoformat() if date_obj else "",
+                "sortDate": ingestion.report_date or (date_obj.isoformat() if date_obj else ""),
             }
         )
 
@@ -281,7 +396,7 @@ def build_chart_series(test_records):
                 continue
             series[metric].append(
                 {
-                    "date": record.get("uploadedAt") or "Unknown",
+                    "date": record.get("reportDate") or record.get("uploadedAt") or "Unknown",
                     "value": value,
                     "title": record.get("title") or "Record",
                 }

@@ -23,7 +23,7 @@ def build_metric_points(test_records):
                 continue
             metric_points[metric].append(
                 {
-                    "date": record.get("uploadedAt"),
+                    "date": record.get("reportDate") or record.get("uploadedAt"),
                     "value": value,
                     "title": record.get("title", "Record"),
                 }

@@ -3,6 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { spawnSync } from 'node:child_process';
+import crypto from 'node:crypto';
 
 const PORT = 5501;
 const __filename = fileURLToPath(import.meta.url);
@@ -13,6 +14,9 @@ const CONTACTS_PATH = path.join(ROOT, 'contacts.json');
 const USER_FILES_DIR = path.join(ROOT, 'user_files');
 const ENV_PATH = path.join(ROOT, '.env');
 const SUPPLEMENT_SCRIPT = path.join(ROOT, 'scripts', 'supplement_recommender.py');
+const INGESTION_SCRIPT = path.join(ROOT, 'scripts', 'lab_ingestion.py');
+const CACHE_DIR = path.join(ROOT, '.cache');
+const SUPPLEMENT_CACHE_PATH = path.join(CACHE_DIR, 'supplement-cache.json');
 
 const CONTENT_TYPES = {
   '.html': 'text/html; charset=utf-8',
@@ -92,6 +96,55 @@ function runSupplementAnalyzer() {
     return { data: JSON.parse(result.stdout || '{}') };
   } catch {
     return { error: 'Python analyzer returned invalid JSON.' };
+  }
+}
+
+function getAnalysisCacheKey() {
+  try {
+    const profileContent = fs.readFileSync(PROFILE_PATH, 'utf8');
+    const scriptContent = fs.existsSync(SUPPLEMENT_SCRIPT) ? fs.readFileSync(SUPPLEMENT_SCRIPT, 'utf8') : '';
+    const ingestionContent = fs.existsSync(INGESTION_SCRIPT) ? fs.readFileSync(INGESTION_SCRIPT, 'utf8') : '';
+    return crypto
+      .createHash('sha256')
+      .update(profileContent)
+      .update(scriptContent)
+      .update(ingestionContent)
+      .digest('hex');
+  } catch {
+    return '';
+  }
+}
+
+function readSupplementCache() {
+  try {
+    const raw = fs.readFileSync(SUPPLEMENT_CACHE_PATH, 'utf8');
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== 'object') return null;
+    if (typeof parsed.profileHash !== 'string' || !parsed.data) return null;
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
+function writeSupplementCache(profileHash, data) {
+  try {
+    fs.mkdirSync(CACHE_DIR, { recursive: true });
+    fs.writeFileSync(SUPPLEMENT_CACHE_PATH, JSON.stringify({
+      profileHash,
+      generatedAt: new Date().toISOString(),
+      data
+    }, null, 2), 'utf8');
+  } catch {
+    // Cache write failures should not break API.
+  }
+}
+
+function clearSupplementCache() {
+  try {
+    fs.unlinkSync(SUPPLEMENT_CACHE_PATH);
+  } catch {
+    // Ignore when cache file does not exist.
   }
 }
 
@@ -272,6 +325,7 @@ const server = http.createServer((req, res) => {
           sendJson(res, 500, { error: 'Failed to write medical-profile.json' });
           return;
         }
+        clearSupplementCache();
         sendJson(res, 200, { ok: true });
       });
     });
@@ -287,6 +341,7 @@ const server = http.createServer((req, res) => {
           sendJson(res, 400, { error });
           return;
         }
+        clearSupplementCache();
         sendJson(res, 200, record);
       } catch {
         sendJson(res, 500, { error: 'Failed to save history record file.' });
@@ -310,6 +365,7 @@ const server = http.createServer((req, res) => {
       }
 
       fs.unlink(absolutePath, () => {
+        clearSupplementCache();
         sendJson(res, 200, { ok: true });
       });
     });
@@ -317,12 +373,31 @@ const server = http.createServer((req, res) => {
   }
 
   if (pathname === '/api/recommended-supplements' && req.method === 'GET') {
+    const profileHash = getAnalysisCacheKey();
+    const cached = readSupplementCache();
+
+    if (cached && cached.profileHash === profileHash) {
+      sendJson(res, 200, {
+        ...cached.data,
+        cached: true,
+        cacheGeneratedAt: cached.generatedAt || ''
+      });
+      return;
+    }
+
     const { data, error } = runSupplementAnalyzer();
     if (error) {
       sendJson(res, 500, { error });
       return;
     }
-    sendJson(res, 200, data);
+
+    writeSupplementCache(profileHash, data);
+
+    sendJson(res, 200, {
+      ...data,
+      cached: false,
+      cacheGeneratedAt: new Date().toISOString()
+    });
     return;
   }
 
