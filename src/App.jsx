@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { getMedicalProfile, putMedicalProfile, getContacts, putContacts, createHistoryRecord, deleteHistoryRecordFile } from './medicalApi';
+import { getMedicalProfile, putMedicalProfile, getContacts, putContacts, createHistoryRecord, deleteHistoryRecordFile, getRecommendedSupplements } from './medicalApi';
 
 const EMPTY = {
   schemaVersion: 2,
@@ -94,6 +94,89 @@ const HISTORY_TAG_OPTIONS = [
   'vaccination-record'
 ];
 
+const formatShortDate = (value) => {
+  if (!value) return 'N/A';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return 'N/A';
+  return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+};
+
+const toDisplayList = (value) => {
+  if (Array.isArray(value)) {
+    return value
+      .map((item) => {
+        if (typeof item === 'string') return item;
+        if (item && typeof item === 'object') {
+          const name = String(item.name || '').trim();
+          const reason = String(item.reason || item.description || item.note || '').trim();
+          if (name && reason) return `${name}: ${reason}`;
+          if (name) return name;
+          if (reason) return reason;
+          return JSON.stringify(item);
+        }
+        return String(item || '').trim();
+      })
+      .filter(Boolean);
+  }
+
+  if (typeof value === 'string') {
+    const text = value.trim();
+    return text ? [text] : [];
+  }
+
+  if (value && typeof value === 'object') {
+    return [JSON.stringify(value)];
+  }
+
+  return [];
+};
+
+function TrendChart({ label, points }) {
+  if (!Array.isArray(points) || points.length < 2) {
+    return (
+      <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4">
+        <div className="flex items-center justify-between mb-2">
+          <h4 className="font-black text-sm tracking-tight text-slate-700">{label}</h4>
+          <span className="text-xs text-slate-500 font-semibold">Need at least 2 records</span>
+        </div>
+      </div>
+    );
+  }
+
+  const values = points.map((p) => Number(p.value)).filter((v) => Number.isFinite(v));
+  if (values.length < 2) return null;
+
+  const min = Math.min(...values);
+  const max = Math.max(...values);
+  const span = Math.max(max - min, 1);
+  const width = 100;
+  const height = 36;
+
+  const path = points.map((point, idx) => {
+    const x = (idx / (points.length - 1)) * width;
+    const y = height - (((Number(point.value) - min) / span) * height);
+    return `${idx === 0 ? 'M' : 'L'} ${x.toFixed(2)} ${y.toFixed(2)}`;
+  }).join(' ');
+
+  const latest = points[points.length - 1];
+
+  return (
+    <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4">
+      <div className="flex items-center justify-between mb-2">
+        <h4 className="font-black text-sm tracking-tight text-slate-700">{label}</h4>
+        <span className="text-xs text-slate-500 font-semibold">Latest: {latest.value}</span>
+      </div>
+      <svg viewBox="0 0 100 36" className="w-full h-24">
+        <path d={path} fill="none" stroke="#ef4444" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+      <div className="flex items-center justify-between mt-1 text-[11px] text-slate-500 font-semibold">
+        <span>{formatShortDate(points[0]?.date)}</span>
+        <span>{formatShortDate(latest?.date)}</span>
+      </div>
+    </div>
+  );
+}
+
 export default function App() {
   const [tab, setTab] = useState('home');
   const [wikiType, setWikiType] = useState('firstaid');
@@ -123,6 +206,9 @@ export default function App() {
     prescriptions: false,
     history: false
   });
+  const [supplementData, setSupplementData] = useState(null);
+  const [supplementLoading, setSupplementLoading] = useState(false);
+  const [supplementError, setSupplementError] = useState('');
 
   useEffect(() => {
     getMedicalProfile().then(setProfile);
@@ -132,6 +218,39 @@ export default function App() {
   useEffect(() => {
     putContacts(contacts);
   }, [contacts]);
+
+  useEffect(() => {
+    if (tab !== 'supplements') return;
+    if (supplementData || supplementLoading) return;
+
+    const loadSupplements = async () => {
+      setSupplementLoading(true);
+      setSupplementError('');
+      try {
+        const result = await getRecommendedSupplements();
+        setSupplementData(result);
+      } catch (err) {
+        setSupplementError(err?.message || 'Unable to load recommendations.');
+      } finally {
+        setSupplementLoading(false);
+      }
+    };
+
+    loadSupplements();
+  }, [tab, supplementData, supplementLoading]);
+
+  const refreshSupplements = async () => {
+    setSupplementLoading(true);
+    setSupplementError('');
+    try {
+      const result = await getRecommendedSupplements();
+      setSupplementData(result);
+    } catch (err) {
+      setSupplementError(err?.message || 'Unable to refresh recommendations.');
+    } finally {
+      setSupplementLoading(false);
+    }
+  };
 
   const updateProfile = async (next) => {
     setProfile(next);
@@ -320,6 +439,9 @@ export default function App() {
 
   const currentFirstAid = filteredFirstAid.find(item => item.id === activeFirstAid);
   const currentDisaster = DISASTER_DATA.find(item => item.id === activeDisaster);
+  const supplementList = toDisplayList(supplementData?.recommendations?.supplements);
+  const routineList = toDisplayList(supplementData?.recommendations?.routines);
+  const cautionList = toDisplayList(supplementData?.recommendations?.caution);
 
   return (
     <main className="max-w-md mx-auto min-h-screen pb-24 bg-slate-50">
@@ -377,7 +499,103 @@ export default function App() {
             <button onClick={() => setTab('nearby')} className="p-5 bg-white rounded-3xl shadow text-left font-bold">Find Help</button>
           </div>
           <button onClick={() => setTab('medical')} className="w-full p-5 bg-white rounded-3xl shadow text-left font-bold">Medical Profile</button>
+          <button onClick={() => setTab('supplements')} className="w-full p-5 bg-white rounded-3xl shadow text-left font-bold">Recommended Supplements</button>
           <button onClick={() => setTab('wiki')} className="w-full p-5 bg-gradient-to-r from-red-600 to-red-400 text-white rounded-3xl shadow text-left font-bold">First Aid Wiki</button>
+        </section>
+      )}
+
+      {tab === 'supplements' && (
+        <section className="p-6 space-y-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-2xl bg-red-100 text-red-500 flex items-center justify-center">
+                <i className="fa-solid fa-pills" />
+              </div>
+              <div>
+                <h2 className="text-2xl font-black tracking-tight">Recommended Supplement</h2>
+                <p className="text-xs text-slate-500 font-semibold">Built from blood and lipid test history</p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={refreshSupplements}
+              disabled={supplementLoading}
+              className="px-3 py-2 rounded-xl bg-slate-900 text-white text-xs font-black uppercase tracking-wide disabled:opacity-60"
+            >
+              {supplementLoading ? 'Loading' : 'Refresh'}
+            </button>
+          </div>
+
+          {supplementError && (
+            <div className="bg-red-50 border border-red-200 text-red-600 rounded-2xl p-3 text-sm font-semibold">
+              {supplementError}
+            </div>
+          )}
+
+          {supplementLoading && !supplementData && (
+            <div className="bg-white rounded-3xl p-6 shadow">
+              <p className="font-semibold text-slate-500">Analyzing blood/lipid history...</p>
+            </div>
+          )}
+
+          {!supplementLoading && supplementData && (
+            <>
+              <div className="bg-white rounded-3xl p-5 shadow space-y-3">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-sm font-black uppercase tracking-widest text-slate-400">Analysis Summary</h3>
+                  <span className="text-[11px] text-slate-500 font-semibold">Records: {supplementData.recordsConsidered || 0}</span>
+                </div>
+                <p className="text-sm text-slate-700 font-semibold">
+                  {supplementData.recommendations?.summary || 'No summary available.'}
+                </p>
+                <p className="text-[11px] text-slate-500 font-semibold">
+                  Source: {supplementData.apiUsed ? 'ChatGPT API' : 'Heuristic fallback'}
+                </p>
+              </div>
+
+              <div className="bg-white rounded-3xl p-5 shadow">
+                <h3 className="text-sm font-black uppercase tracking-widest text-slate-400 mb-3">Supplements / Medicines To Discuss</h3>
+                <div className="space-y-2">
+                  {supplementList.map((item, idx) => (
+                    <div key={`${item}-${idx}`} className="bg-slate-50 rounded-2xl p-3 text-sm font-semibold text-slate-700">{item}</div>
+                  ))}
+                  {supplementList.length === 0 && (
+                    <p className="text-sm text-slate-500 font-semibold">No supplement suggestions generated yet.</p>
+                  )}
+                </div>
+              </div>
+
+              <div className="bg-white rounded-3xl p-5 shadow">
+                <h3 className="text-sm font-black uppercase tracking-widest text-slate-400 mb-3">Routines</h3>
+                <div className="space-y-2">
+                  {routineList.map((item, idx) => (
+                    <div key={`${item}-${idx}`} className="bg-slate-50 rounded-2xl p-3 text-sm font-semibold text-slate-700">{item}</div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="bg-white rounded-3xl p-5 shadow">
+                <h3 className="text-sm font-black uppercase tracking-widest text-slate-400 mb-3">Blood / Lipid Trends</h3>
+                <div className="space-y-3">
+                  {Object.entries(supplementData.chartSeries || {}).map(([metric, config]) => (
+                    <TrendChart key={metric} label={config.label || metric} points={config.points || []} />
+                  ))}
+                  {Object.keys(supplementData.chartSeries || {}).length === 0 && (
+                    <p className="text-sm text-slate-500 font-semibold">No chartable numeric values were extracted from blood/lipid records yet.</p>
+                  )}
+                </div>
+              </div>
+
+              <div className="bg-amber-50 border border-amber-200 rounded-3xl p-5">
+                <h3 className="text-sm font-black uppercase tracking-widest text-amber-700 mb-2">Safety</h3>
+                <div className="space-y-2">
+                  {cautionList.map((item, idx) => (
+                    <p key={`${item}-${idx}`} className="text-sm font-semibold text-amber-800">{item}</p>
+                  ))}
+                </div>
+              </div>
+            </>
+          )}
         </section>
       )}
 
@@ -757,6 +975,7 @@ export default function App() {
             { id: 'home', icon: 'fa-house-chimney-crack', label: 'Home' },
             { id: 'contacts', icon: 'fa-phone-volume', label: 'Circle' },
             { id: 'medical', icon: 'fa-notes-medical', label: 'Medical' },
+            { id: 'supplements', icon: 'fa-pills', label: 'Supps' },
             { id: 'nearby', icon: 'fa-location-arrow', label: 'Maps' },
             { id: 'wiki', icon: 'fa-briefcase-medical', label: 'Wiki' }
           ].map(item => (

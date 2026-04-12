@@ -2,6 +2,7 @@ import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { spawnSync } from 'node:child_process';
 
 const PORT = 5501;
 const __filename = fileURLToPath(import.meta.url);
@@ -10,6 +11,8 @@ const ROOT = __dirname;
 const PROFILE_PATH = path.join(ROOT, 'medical-profile.json');
 const CONTACTS_PATH = path.join(ROOT, 'contacts.json');
 const USER_FILES_DIR = path.join(ROOT, 'user_files');
+const ENV_PATH = path.join(ROOT, '.env');
+const SUPPLEMENT_SCRIPT = path.join(ROOT, 'scripts', 'supplement_recommender.py');
 
 const CONTENT_TYPES = {
   '.html': 'text/html; charset=utf-8',
@@ -34,6 +37,63 @@ const MIME_TO_EXT = {
   'application/pdf': '.pdf',
   'text/plain': '.txt'
 };
+
+function loadDotEnv() {
+  if (!fs.existsSync(ENV_PATH)) return;
+
+  try {
+    const lines = fs.readFileSync(ENV_PATH, 'utf8').split(/\r?\n/);
+    lines.forEach((line) => {
+      const trimmed = line.trim();
+      if (!trimmed || trimmed.startsWith('#')) return;
+
+      const index = trimmed.indexOf('=');
+      if (index <= 0) return;
+
+      const key = trimmed.slice(0, index).trim();
+      const value = trimmed.slice(index + 1).trim().replace(/^['\"]|['\"]$/g, '');
+      if (key && process.env[key] === undefined) {
+        process.env[key] = value;
+      }
+    });
+  } catch {
+    // Keep defaults if env loading fails.
+  }
+}
+
+function runSupplementAnalyzer() {
+  const pythonCmd = process.env.PYTHON_BIN || 'python';
+  const useUv = (process.env.PYTHON_USE_UV || '').trim() === '1' || pythonCmd === 'uv';
+  const command = useUv ? 'uv' : pythonCmd;
+  const args = useUv
+    ? ['run', 'python', SUPPLEMENT_SCRIPT, PROFILE_PATH, ROOT]
+    : [SUPPLEMENT_SCRIPT, PROFILE_PATH, ROOT];
+
+  const result = spawnSync(command, args, {
+    cwd: ROOT,
+    encoding: 'utf8',
+    timeout: 30000,
+    env: process.env
+  });
+
+  if (result.error) {
+    return {
+      error: 'Failed to start Python analyzer. Check if Python is installed and available on PATH.'
+    };
+  }
+
+  if (result.status !== 0) {
+    return {
+      error: `Python analyzer failed: ${(result.stderr || result.stdout || '').trim() || 'Unknown error'}`
+    };
+  }
+
+  try {
+    return { data: JSON.parse(result.stdout || '{}') };
+  } catch {
+    return { error: 'Python analyzer returned invalid JSON.' };
+  }
+}
 
 function ensureUserFilesDir() {
   fs.mkdirSync(USER_FILES_DIR, { recursive: true });
@@ -256,6 +316,16 @@ const server = http.createServer((req, res) => {
     return;
   }
 
+  if (pathname === '/api/recommended-supplements' && req.method === 'GET') {
+    const { data, error } = runSupplementAnalyzer();
+    if (error) {
+      sendJson(res, 500, { error });
+      return;
+    }
+    sendJson(res, 200, data);
+    return;
+  }
+
   if (pathname === '/api/contacts' && req.method === 'GET') {
     fs.readFile(CONTACTS_PATH, 'utf8', (err, text) => {
       if (err) {
@@ -287,6 +357,8 @@ const server = http.createServer((req, res) => {
 
   serveStatic(req, res);
 });
+
+loadDotEnv();
 
 server.listen(PORT, () => {
   console.log(`RescueNow local server running at http://localhost:${PORT}`);

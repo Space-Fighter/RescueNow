@@ -176,3 +176,16 @@ export async function deleteHistoryRecordFile(filePath) {
     body: JSON.stringify({ filePath })
   });
 }
+
+export async function getRecommendedSupplements() {
+  const response = await fetchWithTimeout('/api/recommended-supplements', {
+    method: 'GET'
+  }, 15000);
+
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({ error: 'Unable to fetch supplement recommendations.' }));
+    throw new Error(err.error || 'Unable to fetch supplement recommendations.');
+  }
+
+  return await response.json();
+}
