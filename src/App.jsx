@@ -102,6 +102,11 @@ export default function App() {
   const [historyFile, setHistoryFile] = useState(null);
   const [historySaving, setHistorySaving] = useState(false);
   const [historyError, setHistoryError] = useState('');
+  const [medicalSections, setMedicalSections] = useState({
+    vital: true,
+    prescriptions: false,
+    history: false
+  });
 
   useEffect(() => {
     getMedicalProfile().then(setProfile);
@@ -251,6 +256,13 @@ export default function App() {
 
   const removeContact = (idx) => {
     setContacts(prev => prev.filter((_, i) => i !== idx));
+  };
+
+  const toggleMedicalSection = (sectionKey) => {
+    setMedicalSections(prev => ({
+      ...prev,
+      [sectionKey]: !prev[sectionKey]
+    }));
   };
 
   const findNearby = (type) => {
@@ -449,8 +461,15 @@ export default function App() {
         <section className="px-6 py-6">
           <div className="space-y-4">
             <div className="bg-white rounded-3xl p-6 shadow">
-              <h2 className="font-black text-rose-500 text-xs uppercase tracking-[0.2em] mb-4">Vital Info</h2>
-              <div className="space-y-3">
+              <button
+                type="button"
+                onClick={() => toggleMedicalSection('vital')}
+                className="w-full flex items-center justify-between mb-4"
+              >
+                <h2 className="font-black text-rose-500 text-xs uppercase tracking-[0.2em]">Vital Info</h2>
+                <i className={`fa-solid fa-chevron-down text-slate-400 transition-transform ${medicalSections.vital ? 'rotate-180' : ''}`} />
+              </button>
+              {medicalSections.vital && <div className="space-y-3">
                 <label className="block text-[11px] font-black uppercase tracking-wider text-slate-400">Blood Group</label>
                 <select
                   value={profile.patient.bloodGroup}
@@ -549,11 +568,19 @@ export default function App() {
                   placeholder="Doctor's Name & Number"
                   className="w-full bg-slate-50 p-3 rounded-2xl font-semibold"
                 />
-              </div>
+              </div>}
             </div>
 
             <div className="bg-white rounded-3xl p-6 shadow">
-              <h2 className="font-black text-rose-500 text-xs uppercase tracking-[0.2em] mb-4">Prescriptions</h2>
+              <button
+                type="button"
+                onClick={() => toggleMedicalSection('prescriptions')}
+                className="w-full flex items-center justify-between mb-4"
+              >
+                <h2 className="font-black text-rose-500 text-xs uppercase tracking-[0.2em]">Prescriptions</h2>
+                <i className={`fa-solid fa-chevron-down text-slate-400 transition-transform ${medicalSections.prescriptions ? 'rotate-180' : ''}`} />
+              </button>
+              {medicalSections.prescriptions && <>
               <form onSubmit={addMedication} className="space-y-2 mb-4">
                 <input value={medName} onChange={(e) => setMedName(e.target.value)} placeholder="Medicine Name:" className="w-full bg-slate-50 p-3 rounded-2xl font-semibold" />
                 <input value={medTiming} onChange={(e) => setMedTiming(e.target.value)} placeholder="Dosage Timing:" className="w-full bg-slate-50 p-3 rounded-2xl font-semibold" />
@@ -573,10 +600,19 @@ export default function App() {
                   </div>
                 ))}
               </div>
+              </>}
             </div>
 
             <div className="bg-white rounded-3xl p-4 shadow">
-              <h2 className="font-black text-rose-500 text-xs uppercase tracking-[0.2em] mb-4">Patient History Files</h2>
+              <button
+                type="button"
+                onClick={() => toggleMedicalSection('history')}
+                className="w-full flex items-center justify-between mb-4"
+              >
+                <h2 className="font-black text-rose-500 text-xs uppercase tracking-[0.2em]">Patient History Files</h2>
+                <i className={`fa-solid fa-chevron-down text-slate-400 transition-transform ${medicalSections.history ? 'rotate-180' : ''}`} />
+              </button>
+              {medicalSections.history && <>
               <form onSubmit={addHistoryRecord} className="space-y-2 mb-4">
                 <input
                   value={historyTitle}
@@ -652,6 +688,7 @@ export default function App() {
               </div>
 
               {historyError && <p className="text-xs font-semibold text-red-500 mt-2">{historyError}</p>}
+              </>}
             </div>
 
             <div className="bg-white rounded-3xl p-4 shadow">
