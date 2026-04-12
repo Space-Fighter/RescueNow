@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { getMedicalProfile, putMedicalProfile } from './medicalApi';
+import { getMedicalProfile, putMedicalProfile, getContacts, putContacts, createHistoryRecord, deleteHistoryRecordFile } from './medicalApi';
 
 const EMPTY = {
   schemaVersion: 2,
@@ -7,7 +7,27 @@ const EMPTY = {
   updatedAt: '',
   patient: { bloodGroup: '', allergies: [], conditions: [] },
   emergencyDoctor: { raw: '' },
-  medications: []
+  medications: [],
+  historyRecords: []
+};
+
+const parseList = (value) => String(value || '')
+  .split(',')
+  .map(v => v.trim())
+  .filter(Boolean);
+
+const readAsDataUrl = (file) => new Promise((resolve, reject) => {
+  const reader = new FileReader();
+  reader.onload = () => resolve(String(reader.result || ''));
+  reader.onerror = () => reject(new Error('Failed to read file'));
+  reader.readAsDataURL(file);
+});
+
+const formatBytes = (value) => {
+  if (!value) return '0 B';
+  if (value < 1024) return `${value} B`;
+  if (value < 1024 * 1024) return `${(value / 1024).toFixed(1)} KB`;
+  return `${(value / (1024 * 1024)).toFixed(1)} MB`;
 };
 
 const CONTACTS = [
@@ -67,13 +87,7 @@ export default function App() {
   const [wikiSearch, setWikiSearch] = useState('');
   const [sosOpen, setSosOpen] = useState(false);
 
-  const [contacts, setContacts] = useState(() => {
-    try {
-      return JSON.parse(localStorage.getItem('rescueContacts') || '[]');
-    } catch {
-      return [];
-    }
-  });
+  const [contacts, setContacts] = useState([]);
   const [contactName, setContactName] = useState('');
   const [contactNumber, setContactNumber] = useState('');
 
@@ -83,19 +97,20 @@ export default function App() {
   const [medTiming, setMedTiming] = useState('');
   const [allergyDraft, setAllergyDraft] = useState('');
   const [conditionDraft, setConditionDraft] = useState('');
+  const [historyTitle, setHistoryTitle] = useState('');
+  const [historyNotes, setHistoryNotes] = useState('');
+  const [historyFile, setHistoryFile] = useState(null);
+  const [historySaving, setHistorySaving] = useState(false);
+  const [historyError, setHistoryError] = useState('');
 
   useEffect(() => {
     getMedicalProfile().then(setProfile);
+    getContacts().then(setContacts);
   }, []);
 
   useEffect(() => {
-    localStorage.setItem('rescueContacts', JSON.stringify(contacts));
+    putContacts(contacts);
   }, [contacts]);
-
-  const parseList = (value) => value
-    .split(/,|\n/)
-    .map(v => v.trim())
-    .filter(Boolean);
 
   const updateProfile = async (next) => {
     setProfile(next);
@@ -169,6 +184,58 @@ export default function App() {
       medications: profile.medications.filter((_, i) => i !== idx)
     };
     updateProfile(next);
+  };
+
+  const addHistoryRecord = async (e) => {
+    e.preventDefault();
+    if (!historyFile && !historyNotes.trim()) {
+      setHistoryError('Choose a file or write notes to save as text.');
+      return;
+    }
+
+    setHistorySaving(true);
+    setHistoryError('');
+
+    try {
+      const dataUrl = historyFile ? await readAsDataUrl(historyFile) : '';
+      const savedRecord = await createHistoryRecord({
+        title: historyTitle.trim(),
+        notes: historyNotes.trim(),
+        fileName: historyFile?.name || '',
+        mimeType: historyFile?.type || 'text/plain',
+        dataUrl
+      });
+
+      await updateProfile({
+        ...profile,
+        historyRecords: [...(profile.historyRecords || []), savedRecord]
+      });
+
+      setHistoryTitle('');
+      setHistoryNotes('');
+      setHistoryFile(null);
+    } catch (err) {
+      setHistoryError(err?.message || 'Unable to save this record. Try again.');
+    } finally {
+      setHistorySaving(false);
+    }
+  };
+
+  const removeHistoryRecord = async (recordToRemove) => {
+    if (!recordToRemove) return;
+
+    try {
+      if (recordToRemove.filePath) {
+        await deleteHistoryRecordFile(recordToRemove.filePath);
+      }
+    } catch {
+      setHistoryError('File metadata was removed, but file deletion failed on disk.');
+    }
+
+    await updateProfile({
+      ...profile,
+      historyRecords: (profile.historyRecords || []).filter(record => record.id !== recordToRemove.id)
+    });
   };
 
   const openSOS = () => setSosOpen(true);
@@ -506,6 +573,85 @@ export default function App() {
                   </div>
                 ))}
               </div>
+            </div>
+
+            <div className="bg-white rounded-3xl p-4 shadow">
+              <h2 className="font-black text-rose-500 text-xs uppercase tracking-[0.2em] mb-4">Patient History Files</h2>
+              <form onSubmit={addHistoryRecord} className="space-y-2 mb-4">
+                <input
+                  value={historyTitle}
+                  onChange={(e) => setHistoryTitle(e.target.value)}
+                  placeholder="Optional title (e.g. Blood Test Jan 2026)"
+                  className="w-full bg-slate-50 p-3 rounded-2xl font-semibold"
+                />
+                <textarea
+                  value={historyNotes}
+                  onChange={(e) => setHistoryNotes(e.target.value)}
+                  placeholder="Optional notes"
+                  className="w-full bg-slate-50 p-3 rounded-2xl font-semibold min-h-20"
+                />
+                <input
+                  type="file"
+                  accept=".pdf,.txt,image/*"
+                  onChange={(e) => {
+                    const selected = e.target.files?.[0] || null;
+                    setHistoryFile(selected);
+                    setHistoryError('');
+                  }}
+                  className="w-full bg-slate-50 p-3 rounded-2xl font-semibold text-sm"
+                />
+                {historyFile && (
+                  <p className="text-xs text-slate-500 font-semibold">
+                    Selected: {historyFile.name} ({formatBytes(historyFile.size)})
+                  </p>
+                )}
+                <button disabled={historySaving} className="w-full bg-slate-900 text-white p-3 rounded-2xl font-bold disabled:opacity-60">
+                  {historySaving ? 'Saving...' : 'Save History Record'}
+                </button>
+                <p className="text-[11px] text-slate-400 font-semibold">Supported: PDF, TXT, and images. If no file is selected, notes are saved as a .txt file in user_files.</p>
+              </form>
+
+              <div className="space-y-2">
+                {(profile.historyRecords || []).length === 0 && (
+                  <p className="text-xs text-slate-400 font-semibold">No history files saved yet.</p>
+                )}
+
+                {(profile.historyRecords || []).map((record) => (
+                  <div key={record.id} className="bg-slate-50 p-3 rounded-2xl">
+                    <div className="flex items-start justify-between gap-2">
+                      <div>
+                        <p className="font-bold text-slate-800 text-sm">{record.title || record.fileName}</p>
+                        <p className="text-[11px] text-slate-500">{record.fileName} • {record.fileType || 'unknown'} • {formatBytes(record.size)} • {new Date(record.uploadedAt).toLocaleString()}</p>
+                        {record.filePath && <p className="text-[11px] text-slate-500">Path: {record.filePath}</p>}
+                        {record.notes && <p className="text-xs text-slate-500 mt-1">{record.notes}</p>}
+                      </div>
+                      <button type="button" onClick={() => removeHistoryRecord(record)} className="text-slate-400 hover:text-red-500">
+                        <i className="fa-solid fa-trash-can" />
+                      </button>
+                    </div>
+
+                    <div className="flex gap-2 mt-2">
+                      <a
+                        href={record.filePath ? `/${record.filePath}` : record.dataUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-xs px-3 py-1 rounded-full bg-white font-bold text-slate-700"
+                      >
+                        View
+                      </a>
+                      <a
+                        href={record.filePath ? `/${record.filePath}` : record.dataUrl}
+                        download={record.fileName}
+                        className="text-xs px-3 py-1 rounded-full bg-white font-bold text-slate-700"
+                      >
+                        Download
+                      </a>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {historyError && <p className="text-xs font-semibold text-red-500 mt-2">{historyError}</p>}
             </div>
 
             <div className="bg-white rounded-3xl p-4 shadow">
