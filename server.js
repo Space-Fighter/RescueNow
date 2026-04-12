@@ -72,6 +72,9 @@ function parseJsonBody(req, res, maxBytes, onSuccess) {
 function makeHistoryRecordFromRequest(input) {
   const title = String(input.title || '').trim();
   const notes = String(input.notes || '').trim();
+  const tags = Array.isArray(input.tags)
+    ? input.tags.map(tag => String(tag || '').trim().toLowerCase()).filter(Boolean)
+    : String(input.tags || '').split(',').map(tag => tag.trim().toLowerCase()).filter(Boolean);
   const uploadedAt = new Date().toISOString();
   const id = `${Date.now()}-${Math.random().toString(16).slice(2, 8)}`;
 
@@ -92,6 +95,7 @@ function makeHistoryRecordFromRequest(input) {
         mimeType: 'text/plain',
         size: Buffer.byteLength(notes, 'utf8'),
         uploadedAt,
+        tags,
         notes,
         filePath: `user_files/${fileName}`
       }
@@ -121,6 +125,7 @@ function makeHistoryRecordFromRequest(input) {
       mimeType,
       size: fileBuffer.length,
       uploadedAt,
+      tags,
       notes,
       filePath: `user_files/${fileName}`
     }

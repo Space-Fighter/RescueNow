@@ -13,6 +13,13 @@ const normalizeTextList = (value) => String(value || '')
   .map(v => v.trim())
   .filter(Boolean);
 
+const normalizeTagList = (value) => {
+  if (Array.isArray(value)) {
+    return value.map(v => String(v || '').trim().toLowerCase()).filter(Boolean);
+  }
+  return normalizeTextList(value).map(v => v.toLowerCase());
+};
+
 const fetchWithTimeout = async (url, options = {}, timeoutMs = 12000) => {
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
@@ -46,6 +53,7 @@ const normalizeHistoryRecords = (records) => {
         filePath,
         mimeType: String(item?.mimeType || 'application/octet-stream').trim(),
         size: Number(item?.size || 0),
+        tags: normalizeTagList(item?.tags),
         notes: String(item?.notes || '').trim(),
         uploadedAt: String(item?.uploadedAt || '').trim(),
         dataUrl

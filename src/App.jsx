@@ -79,6 +79,21 @@ const DISASTER_DATA = [
   }
 ];
 
+const HISTORY_TAG_OPTIONS = [
+  'lipid-test',
+  'blood-test',
+  'doctor-prescription',
+  'cbc',
+  'sugar-test',
+  'thyroid-test',
+  'x-ray',
+  'mri',
+  'ct-scan',
+  'ecg',
+  'discharge-summary',
+  'vaccination-record'
+];
+
 export default function App() {
   const [tab, setTab] = useState('home');
   const [wikiType, setWikiType] = useState('firstaid');
@@ -99,6 +114,7 @@ export default function App() {
   const [conditionDraft, setConditionDraft] = useState('');
   const [historyTitle, setHistoryTitle] = useState('');
   const [historyNotes, setHistoryNotes] = useState('');
+  const [historyTags, setHistoryTags] = useState([]);
   const [historyFile, setHistoryFile] = useState(null);
   const [historySaving, setHistorySaving] = useState(false);
   const [historyError, setHistoryError] = useState('');
@@ -206,6 +222,7 @@ export default function App() {
       const savedRecord = await createHistoryRecord({
         title: historyTitle.trim(),
         notes: historyNotes.trim(),
+        tags: historyTags,
         fileName: historyFile?.name || '',
         mimeType: historyFile?.type || 'text/plain',
         dataUrl
@@ -218,6 +235,7 @@ export default function App() {
 
       setHistoryTitle('');
       setHistoryNotes('');
+      setHistoryTags([]);
       setHistoryFile(null);
     } catch (err) {
       setHistoryError(err?.message || 'Unable to save this record. Try again.');
@@ -263,6 +281,14 @@ export default function App() {
       ...prev,
       [sectionKey]: !prev[sectionKey]
     }));
+  };
+
+  const toggleHistoryTag = (tag) => {
+    setHistoryTags(prev => (
+      prev.includes(tag)
+        ? prev.filter((item) => item !== tag)
+        : [...prev, tag]
+    ));
   };
 
   const findNearby = (type) => {
@@ -626,6 +652,24 @@ export default function App() {
                   placeholder="Optional notes"
                   className="w-full bg-slate-50 p-3 rounded-2xl font-semibold min-h-20"
                 />
+                <div className="space-y-2">
+                  <p className="text-[11px] font-black uppercase tracking-wider text-slate-400">Choose Tags</p>
+                  <div className="flex flex-wrap gap-2">
+                    {HISTORY_TAG_OPTIONS.map((tag) => {
+                      const selected = historyTags.includes(tag);
+                      return (
+                        <button
+                          key={tag}
+                          type="button"
+                          onClick={() => toggleHistoryTag(tag)}
+                          className={`px-3 py-1 rounded-full text-xs font-bold ${selected ? 'bg-rose-500 text-white' : 'bg-slate-100 text-slate-600'}`}
+                        >
+                          {tag}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
                 <input
                   type="file"
                   accept=".pdf,.txt,image/*"
@@ -659,6 +703,15 @@ export default function App() {
                         <p className="font-bold text-slate-800 text-sm">{record.title || record.fileName}</p>
                         <p className="text-[11px] text-slate-500">{record.fileName} • {record.fileType || 'unknown'} • {formatBytes(record.size)} • {new Date(record.uploadedAt).toLocaleString()}</p>
                         {record.filePath && <p className="text-[11px] text-slate-500">Path: {record.filePath}</p>}
+                        {Array.isArray(record.tags) && record.tags.length > 0 && (
+                          <div className="flex flex-wrap gap-1 mt-1">
+                            {record.tags.map((tag, idx) => (
+                              <span key={`${tag}-${idx}`} className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-100 text-rose-600">
+                                {tag}
+                              </span>
+                            ))}
+                          </div>
+                        )}
                         {record.notes && <p className="text-xs text-slate-500 mt-1">{record.notes}</p>}
                       </div>
                       <button type="button" onClick={() => removeHistoryRecord(record)} className="text-slate-400 hover:text-red-500">
