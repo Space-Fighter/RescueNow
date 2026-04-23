@@ -166,14 +166,13 @@ const getRandomCatalogItem = (items) => {
   return items[Math.floor(Math.random() * items.length)] || null;
 };
 
-const compareTime = (a, b) => {
-  const toMinutes = (value) => {
-    const match = String(value || '').match(/^(\d{1,2}):(\d{2})$/);
-    if (!match) return Number.MAX_SAFE_INTEGER;
-    return (Number(match[1]) * 60) + Number(match[2]);
-  };
-  return toMinutes(a) - toMinutes(b);
+const timeToMinutes = (value) => {
+  const match = String(value || '').match(/^(\d{1,2}):(\d{2})$/);
+  if (!match) return Number.MAX_SAFE_INTEGER;
+  return (Number(match[1]) * 60) + Number(match[2]);
 };
+
+const compareTime = (a, b) => timeToMinutes(a) - timeToMinutes(b);
 
 const buildRoutineDraft = (routine = null) => ({
   id: routine?.id || '',
@@ -296,6 +295,11 @@ export default function App() {
   const [routineModalOpen, setRoutineModalOpen] = useState(false);
   const [routineDraft, setRoutineDraft] = useState(buildRoutineDraft());
   const [routinesLoaded, setRoutinesLoaded] = useState(false);
+  const [reminderHidden, setReminderHidden] = useState(false);
+  const [currentClockMinutes, setCurrentClockMinutes] = useState(() => {
+    const now = new Date();
+    return (now.getHours() * 60) + now.getMinutes();
+  });
   const [timerMode, setTimerMode] = useState('focus');
   const [timeLeft, setTimeLeft] = useState(FOCUS_SECONDS);
   const [timerRunning, setTimerRunning] = useState(false);
@@ -357,6 +361,17 @@ export default function App() {
 
     return () => window.clearInterval(intervalId);
   }, [timerRunning, timerMode]);
+
+  useEffect(() => {
+    const updateCurrentMinutes = () => {
+      const now = new Date();
+      setCurrentClockMinutes((now.getHours() * 60) + now.getMinutes());
+    };
+
+    updateCurrentMinutes();
+    const intervalId = window.setInterval(updateCurrentMinutes, 60 * 1000);
+    return () => window.clearInterval(intervalId);
+  }, []);
 
   useEffect(() => {
     if (tab !== 'routines') return;
@@ -704,6 +719,31 @@ export default function App() {
   const currentDisaster = DISASTER_DATA.find((item) => item.id === activeDisaster);
   const supplementList = Array.isArray(supplementData?.recommendations?.supplements) ? supplementData.recommendations.supplements : [];
   const cautionList = Array.isArray(supplementData?.recommendations?.caution) ? supplementData.recommendations.caution : [];
+  const closestRoutine = useMemo(() => {
+    if (!Array.isArray(routines) || routines.length === 0) return null;
+
+    let bestRoutine = null;
+    let bestDelta = Number.MAX_SAFE_INTEGER;
+
+    routines.forEach((routine) => {
+      const startMinutes = timeToMinutes(routine.startTime);
+      if (!Number.isFinite(startMinutes) || startMinutes === Number.MAX_SAFE_INTEGER) return;
+
+      const directDelta = Math.abs(startMinutes - currentClockMinutes);
+      const wrapDelta = 1440 - directDelta;
+      const nearestDelta = Math.min(directDelta, wrapDelta);
+
+      if (nearestDelta < bestDelta) {
+        bestDelta = nearestDelta;
+        bestRoutine = {
+          ...routine,
+          minutesAway: nearestDelta
+        };
+      }
+    });
+
+    return bestRoutine;
+  }, [routines, currentClockMinutes]);
   const breakModeVisible = timerMode === 'break' || focusFinished || breakFinished;
   const catalogTypes = ['All', ...new Set(exerciseCatalog.map((item) => item.Exercise_type))];
   const catalogDifficulties = ['All', ...new Set(exerciseCatalog.map((item) => item.Difficulty))];
@@ -778,6 +818,47 @@ export default function App() {
               Start 5 Min Break
             </button>
           </div>
+
+          {!reminderHidden && closestRoutine && (
+            <div className="bg-white rounded-[2rem] p-5 shadow-sm border border-slate-200">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="text-xs font-black uppercase tracking-[0.2em] text-violet-500">Reminder</p>
+                  <h2 className="text-xl font-black mt-2">{closestRoutine.name}</h2>
+                  <p className="text-sm text-slate-500 font-semibold mt-1">
+                    {closestRoutine.startTime} - {closestRoutine.endTime} · {closestRoutine.type}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setReminderHidden(true)}
+                  className="w-11 h-11 rounded-2xl bg-slate-100 text-slate-700 text-lg"
+                  aria-label="Hide reminder"
+                  title="Hide reminder"
+                >
+                  👁
+                </button>
+              </div>
+              <p className="text-sm text-slate-600 font-medium mt-3">
+                {closestRoutine.minutesAway === 0
+                  ? 'This routine is happening right now.'
+                  : `This is the closest routine to your current time, about ${closestRoutine.minutesAway} minute${closestRoutine.minutesAway === 1 ? '' : 's'} away.`}
+              </p>
+              {closestRoutine.description && (
+                <p className="text-sm text-slate-500 mt-2">{closestRoutine.description}</p>
+              )}
+            </div>
+          )}
+
+          {reminderHidden && closestRoutine && (
+            <button
+              type="button"
+              onClick={() => setReminderHidden(false)}
+              className="w-full rounded-2xl bg-white border border-slate-200 px-4 py-3 text-sm font-black text-slate-700"
+            >
+              👁 Show Reminder
+            </button>
+          )}
 
           {focusFinished && (
             <div className="grid grid-cols-1 gap-3">
