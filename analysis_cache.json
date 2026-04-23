@@ -1,0 +1,126 @@
+{
+  "file_hash": "5e3cddf2e75a675de5fd46f5a1b8a2713192118c1a5e514cb420bba45d464e49",
+  "analysis_result": {
+    "recordsConsidered": 3,
+    "recommendations": {
+      "supplements": [
+        "Omega-3 fatty acids: To help maintain healthy triglyceride levels and support cardiovascular health.",
+        "Niacin (Vitamin B3): May help increase HDL cholesterol levels.",
+        "Fiber supplements (e.g., psyllium husk): To support cholesterol management by reducing LDL cholesterol."
+      ],
+      "routines": [],
+      "caution": [
+        "Please consult with a healthcare professional before starting any new supplements or making significant lifestyle changes. These suggestions are based on trends in lipid and blood test results but do not replace professional medical advice."
+      ],
+      "summary": "The patient's lipid profile shows generally acceptable total cholesterol and LDL levels with some fluctuations in HDL and triglycerides. Focus on maintaining or improving HDL levels and managing triglycerides through diet, exercise, and possibly supplements may be beneficial. Doctor confirmation is required."
+    },
+    "chartSeries": {
+      "total_cholesterol": {
+        "label": "Total Cholesterol",
+        "points": [
+          {
+            "date": "2025-03-16",
+            "value": 150.4,
+            "title": "March Report (Dr Lal Pathlabs)"
+          },
+          {
+            "date": "2025-07-22",
+            "value": 150.0,
+            "title": "very-bad-blood-report-1775984167844.pdf"
+          },
+          {
+            "date": "2025-12-27",
+            "value": 135.0,
+            "title": "DECEMBER BLOOD TEST"
+          }
+        ]
+      },
+      "ldl": {
+        "label": "LDL",
+        "points": [
+          {
+            "date": "2025-03-16",
+            "value": 74.66,
+            "title": "March Report (Dr Lal Pathlabs)"
+          },
+          {
+            "date": "2025-07-22",
+            "value": 41.0,
+            "title": "very-bad-blood-report-1775984167844.pdf"
+          },
+          {
+            "date": "2025-12-27",
+            "value": 81.0,
+            "title": "DECEMBER BLOOD TEST"
+          }
+        ]
+      },
+      "hdl": {
+        "label": "HDL",
+        "points": [
+          {
+            "date": "2025-03-16",
+            "value": 41.98,
+            "title": "March Report (Dr Lal Pathlabs)"
+          },
+          {
+            "date": "2025-07-22",
+            "value": 44.0,
+            "title": "very-bad-blood-report-1775984167844.pdf"
+          },
+          {
+            "date": "2025-12-27",
+            "value": 35.0,
+            "title": "DECEMBER BLOOD TEST"
+          }
+        ]
+      },
+      "triglycerides": {
+        "label": "Triglycerides",
+        "points": [
+          {
+            "date": "2025-03-16",
+            "value": 168.8,
+            "title": "March Report (Dr Lal Pathlabs)"
+          },
+          {
+            "date": "2025-07-22",
+            "value": 145.0,
+            "title": "very-bad-blood-report-1775984167844.pdf"
+          },
+          {
+            "date": "2025-12-27",
+            "value": 93.0,
+            "title": "DECEMBER BLOOD TEST"
+          }
+        ]
+      },
+      "fasting_glucose": {
+        "label": "Fasting Glucose",
+        "points": [
+          {
+            "date": "2025-03-16",
+            "value": 79.3,
+            "title": "March Report (Dr Lal Pathlabs)"
+          }
+        ]
+      },
+      "hemoglobin": {
+        "label": "Hemoglobin",
+        "points": [
+          {
+            "date": "2025-12-27",
+            "value": 15.3,
+            "title": "DECEMBER BLOOD TEST"
+          }
+        ]
+      }
+    },
+    "parsersUsed": [
+      "pypdf"
+    ],
+    "apiUsed": true,
+    "apiError": null
+  },
+  "timestamp": "2026-04-23T10:46:55.839922+00:00"
+}

@@ -57,7 +57,7 @@ const MEDICAL_SCHEMA_VERSION = 2;
 function createEmptyMedicalProfile() {
     return {
         schemaVersion: MEDICAL_SCHEMA_VERSION,
-        source: 'rescuenow-medical-id',
+        source: 'heartify-medical-id',
         updatedAt: '',
         patient: {
             bloodGroup: '',
@@ -91,7 +91,7 @@ function migrateMedicalProfile(raw) {
     if (raw.schemaVersion === MEDICAL_SCHEMA_VERSION && raw.patient && Array.isArray(raw.medications)) {
         return {
             schemaVersion: MEDICAL_SCHEMA_VERSION,
-            source: raw.source || 'rescuenow-medical-id',
+            source: raw.source || 'heartify-medical-id',
             updatedAt: raw.updatedAt || '',
             patient: {
                 bloodGroup: raw.patient.bloodGroup || '',
@@ -111,7 +111,7 @@ function migrateMedicalProfile(raw) {
     // Legacy v1 migration support.
     return {
         schemaVersion: MEDICAL_SCHEMA_VERSION,
-        source: 'rescuenow-medical-id',
+        source: 'heartify-medical-id',
         updatedAt: '',
         patient: {
             bloodGroup: raw.bloodGroup || '',

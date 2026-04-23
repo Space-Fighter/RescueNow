@@ -2,8 +2,13 @@ import json
 import os
 import sys
 from pathlib import Path
-from urllib import request, error
+from urllib import error, request
 
+from analysis_cache import (
+    build_profile_analysis_hash,
+    load_cached_analysis,
+    save_analysis_to_cache,
+)
 from lab_ingestion import build_chart_series, build_test_records
 
 
@@ -157,18 +162,7 @@ def normalize_recommendations(recs):
     }
 
 
-def main():
-    if len(sys.argv) < 3:
-        print(json.dumps({"error": "Usage: python supplement_recommender.py <profile_path> <root_path>"}))
-        sys.exit(1)
-
-    profile_path = Path(sys.argv[1]).resolve()
-    root_path = Path(sys.argv[2]).resolve()
-
-    if not profile_path.exists():
-        print(json.dumps({"error": "medical-profile.json not found"}))
-        sys.exit(1)
-
+def build_analysis_result(profile_path: Path, root_path: Path):
     profile, test_records = build_test_records(profile_path, root_path)
     chart_series = build_chart_series(test_records)
 
@@ -182,7 +176,7 @@ def main():
 
     recommendations = normalize_recommendations(ai_result if ai_result else fallback_recommendations(test_records))
 
-    output = {
+    return profile, {
         "recordsConsidered": len(test_records),
         "recommendations": {
             "supplements": recommendations["supplements"],
@@ -195,7 +189,46 @@ def main():
         "apiUsed": bool(ai_result),
         "apiError": api_error,
     }
-    print(json.dumps(output))
+
+
+def generate_analysis(profile_path: Path, root_path: Path, cache_path: Path | None = None):
+    cache_file = cache_path or (root_path / "analysis_cache.json")
+    profile, _ = build_test_records(profile_path, root_path)
+    file_hash = build_profile_analysis_hash(profile, root_path)
+
+    cached = load_cached_analysis(file_hash, cache_file)
+    if cached:
+        return {
+            **cached["analysis_result"],
+            "cached": True,
+            "cacheTimestamp": cached["timestamp"],
+            "fileHash": file_hash,
+        }
+
+    _, result = build_analysis_result(profile_path, root_path)
+    cached_payload = save_analysis_to_cache(file_hash, result, cache_file)
+
+    return {
+        **result,
+        "cached": False,
+        "cacheTimestamp": cached_payload["timestamp"],
+        "fileHash": file_hash,
+    }
+
+
+def main():
+    if len(sys.argv) < 3:
+        print(json.dumps({"error": "Usage: python supplement_recommender.py <profile_path> <root_path>"}))
+        sys.exit(1)
+
+    profile_path = Path(sys.argv[1]).resolve()
+    root_path = Path(sys.argv[2]).resolve()
+
+    if not profile_path.exists():
+        print(json.dumps({"error": "medical-profile.json not found"}))
+        sys.exit(1)
+
+    print(json.dumps(generate_analysis(profile_path, root_path)))
 
 
 if __name__ == "__main__":

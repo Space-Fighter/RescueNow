@@ -1,0 +1,72 @@
+[
+  {
+    "id": "ai-stretch-1",
+    "name": "Morning Stretch",
+    "type": "Exercise",
+    "startTime": "06:10",
+    "endTime": "06:25",
+    "description": "Light stretching and mobility work to wake up the body and loosen stiff muscles.",
+    "position": 0,
+    "source": "ai"
+  },
+  {
+    "id": "ai-exercise-1",
+    "name": "Morning Cardio Walk",
+    "type": "Exercise",
+    "startTime": "07:00",
+    "endTime": "07:40",
+    "description": "30-40 minutes of brisk walking or light cardio to support lipid balance.",
+    "position": 1,
+    "source": "ai"
+  },
+  {
+    "id": "ai-supplement-1",
+    "name": "Take Omega-3 fatty acids",
+    "type": "Supplement",
+    "startTime": "08:30",
+    "endTime": "08:40",
+    "description": "Omega-3 fatty acids: To help maintain healthy triglyceride levels and support cardiovascular health.",
+    "position": 2,
+    "source": "ai"
+  },
+  {
+    "id": "ai-supplement-2",
+    "name": "Take Niacin (Vitamin B3)",
+    "type": "Supplement",
+    "startTime": "13:00",
+    "endTime": "13:10",
+    "description": "Niacin (Vitamin B3): May help increase HDL cholesterol levels.",
+    "position": 3,
+    "source": "ai"
+  },
+  {
+    "id": "ai-supplement-3",
+    "name": "Take Fiber supplements (e.g., psyllium husk)",
+    "type": "Supplement",
+    "startTime": "20:30",
+    "endTime": "20:40",
+    "description": "Fiber supplements (e.g., psyllium husk): To support cholesterol management by reducing LDL cholesterol.",
+    "position": 4,
+    "source": "ai"
+  },
+  {
+    "id": "ai-stretch-2",
+    "name": "Evening Stretch",
+    "type": "Exercise",
+    "startTime": "21:15",
+    "endTime": "21:30",
+    "description": "Gentle stretching or breathing work to wind down before sleep.",
+    "position": 5,
+    "source": "ai"
+  },
+  {
+    "id": "ai-sleep-1",
+    "name": "Sleep",
+    "type": "Custom",
+    "startTime": "22:30",
+    "endTime": "06:00",
+    "description": "Aim for a consistent sleep window to support recovery, hormone balance, and energy.",
+    "position": 6,
+    "source": "ai"
+  }
+]

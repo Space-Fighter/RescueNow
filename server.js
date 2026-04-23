@@ -3,7 +3,6 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { spawnSync } from 'node:child_process';
-import crypto from 'node:crypto';
 
 const PORT = 5501;
 const __filename = fileURLToPath(import.meta.url);
@@ -11,12 +10,11 @@ const __dirname = path.dirname(__filename);
 const ROOT = __dirname;
 const PROFILE_PATH = path.join(ROOT, 'medical-profile.json');
 const CONTACTS_PATH = path.join(ROOT, 'contacts.json');
+const ROUTINES_PATH = path.join(ROOT, 'routines.json');
 const USER_FILES_DIR = path.join(ROOT, 'user_files');
 const ENV_PATH = path.join(ROOT, '.env');
 const SUPPLEMENT_SCRIPT = path.join(ROOT, 'scripts', 'supplement_recommender.py');
-const INGESTION_SCRIPT = path.join(ROOT, 'scripts', 'lab_ingestion.py');
-const CACHE_DIR = path.join(ROOT, '.cache');
-const SUPPLEMENT_CACHE_PATH = path.join(CACHE_DIR, 'supplement-cache.json');
+const ROUTINE_SCRIPT = path.join(ROOT, 'scripts', 'routine_generator.py');
 
 const CONTENT_TYPES = {
   '.html': 'text/html; charset=utf-8',
@@ -55,7 +53,7 @@ function loadDotEnv() {
       if (index <= 0) return;
 
       const key = trimmed.slice(0, index).trim();
-      const value = trimmed.slice(index + 1).trim().replace(/^['\"]|['\"]$/g, '');
+      const value = trimmed.slice(index + 1).trim().replace(/^['"]|['"]$/g, '');
       if (key && process.env[key] === undefined) {
         process.env[key] = value;
       }
@@ -65,105 +63,19 @@ function loadDotEnv() {
   }
 }
 
-function runSupplementAnalyzer() {
-  const pythonCmd = process.env.PYTHON_BIN || 'python';
-  const useUv = (process.env.PYTHON_USE_UV || '').trim() === '1' || pythonCmd === 'uv';
-  const command = useUv ? 'uv' : pythonCmd;
-  const args = useUv
-    ? ['run', 'python', SUPPLEMENT_SCRIPT, PROFILE_PATH, ROOT]
-    : [SUPPLEMENT_SCRIPT, PROFILE_PATH, ROOT];
-
-  const result = spawnSync(command, args, {
-    cwd: ROOT,
-    encoding: 'utf8',
-    timeout: 30000,
-    env: process.env
+function sendJson(res, code, payload) {
+  res.writeHead(code, {
+    'Content-Type': 'application/json; charset=utf-8',
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Methods': 'GET,PUT,POST,DELETE,OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type'
   });
-
-  if (result.error) {
-    return {
-      error: 'Failed to start Python analyzer. Check if Python is installed and available on PATH.'
-    };
-  }
-
-  if (result.status !== 0) {
-    return {
-      error: `Python analyzer failed: ${(result.stderr || result.stdout || '').trim() || 'Unknown error'}`
-    };
-  }
-
-  try {
-    return { data: JSON.parse(result.stdout || '{}') };
-  } catch {
-    return { error: 'Python analyzer returned invalid JSON.' };
-  }
-}
-
-function getAnalysisCacheKey() {
-  try {
-    const profileContent = fs.readFileSync(PROFILE_PATH, 'utf8');
-    const scriptContent = fs.existsSync(SUPPLEMENT_SCRIPT) ? fs.readFileSync(SUPPLEMENT_SCRIPT, 'utf8') : '';
-    const ingestionContent = fs.existsSync(INGESTION_SCRIPT) ? fs.readFileSync(INGESTION_SCRIPT, 'utf8') : '';
-    return crypto
-      .createHash('sha256')
-      .update(profileContent)
-      .update(scriptContent)
-      .update(ingestionContent)
-      .digest('hex');
-  } catch {
-    return '';
-  }
-}
-
-function readSupplementCache() {
-  try {
-    const raw = fs.readFileSync(SUPPLEMENT_CACHE_PATH, 'utf8');
-    const parsed = JSON.parse(raw);
-    if (!parsed || typeof parsed !== 'object') return null;
-    if (typeof parsed.profileHash !== 'string' || !parsed.data) return null;
-    return parsed;
-  } catch {
-    return null;
-  }
-}
-
-function writeSupplementCache(profileHash, data) {
-  try {
-    fs.mkdirSync(CACHE_DIR, { recursive: true });
-    fs.writeFileSync(SUPPLEMENT_CACHE_PATH, JSON.stringify({
-      profileHash,
-      generatedAt: new Date().toISOString(),
-      data
-    }, null, 2), 'utf8');
-  } catch {
-    // Cache write failures should not break API.
-  }
-}
-
-function clearSupplementCache() {
-  try {
-    fs.unlinkSync(SUPPLEMENT_CACHE_PATH);
-  } catch {
-    // Ignore when cache file does not exist.
-  }
-}
-
-function ensureUserFilesDir() {
-  fs.mkdirSync(USER_FILES_DIR, { recursive: true });
-}
-
-function toSafeName(value) {
-  return String(value || '')
-    .trim()
-    .toLowerCase()
-    .replace(/[^a-z0-9-_]+/g, '-')
-    .replace(/^-+|-+$/g, '')
-    .slice(0, 64) || 'record';
+  res.end(JSON.stringify(payload));
 }
 
 function parseJsonBody(req, res, maxBytes, onSuccess) {
   let body = '';
-  req.on('data', chunk => {
+  req.on('data', (chunk) => {
     body += chunk;
     if (body.length > maxBytes) {
       req.destroy();
@@ -182,12 +94,154 @@ function parseJsonBody(req, res, maxBytes, onSuccess) {
   });
 }
 
+function ensureUserFilesDir() {
+  fs.mkdirSync(USER_FILES_DIR, { recursive: true });
+}
+
+function toSafeName(value) {
+  return String(value || '')
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9-_]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 64) || 'record';
+}
+
+function readJsonFile(filePath, fallbackValue) {
+  try {
+    const text = fs.readFileSync(filePath, 'utf8');
+    return JSON.parse(text);
+  } catch {
+    return fallbackValue;
+  }
+}
+
+function writeJsonFile(filePath, value) {
+  fs.writeFileSync(filePath, JSON.stringify(value, null, 2), 'utf8');
+}
+
+function createEmptyMedicalProfile() {
+  return {
+    schemaVersion: 2,
+    source: 'heartify-medical-id',
+    updatedAt: '',
+    patient: { bloodGroup: '', allergies: [], conditions: [] },
+    emergencyDoctor: { raw: '' },
+    medications: [],
+    historyRecords: []
+  };
+}
+
+function normalizeRoutineType(value) {
+  const type = String(value || 'Custom').trim().toLowerCase();
+  if (type === 'exercise') return 'Exercise';
+  if (type === 'supplement') return 'Supplement';
+  if (type === 'study') return 'Study';
+  return 'Custom';
+}
+
+function timeToMinutes(value) {
+  const match = String(value || '').match(/^(\d{1,2}):(\d{2})$/);
+  if (!match) return Number.MAX_SAFE_INTEGER;
+  return (Number(match[1]) * 60) + Number(match[2]);
+}
+
+function normalizeRoutineRecord(input, index = 0) {
+  return {
+    id: String(input?.id || `${Date.now()}-${Math.random().toString(16).slice(2, 8)}`),
+    name: String(input?.name || '').trim(),
+    type: normalizeRoutineType(input?.type),
+    startTime: String(input?.startTime || '').trim(),
+    endTime: String(input?.endTime || '').trim(),
+    description: String(input?.description || '').trim(),
+    position: Number.isFinite(Number(input?.position)) ? Number(input.position) : index,
+    source: String(input?.source || 'manual').trim() || 'manual'
+  };
+}
+
+function sortRoutines(routines) {
+  return [...routines].sort((a, b) => {
+    const timeDelta = timeToMinutes(a.startTime) - timeToMinutes(b.startTime);
+    if (timeDelta !== 0) return timeDelta;
+
+    return String(a.name || '').localeCompare(String(b.name || ''));
+  }).map((routine, index) => ({
+    ...routine,
+    position: index
+  }));
+}
+
+function ensureRoutinesFile() {
+  if (!fs.existsSync(ROUTINES_PATH)) {
+    writeJsonFile(ROUTINES_PATH, []);
+  }
+}
+
+function readRoutines() {
+  ensureRoutinesFile();
+  const raw = readJsonFile(ROUTINES_PATH, []);
+  const normalized = Array.isArray(raw) ? raw.map((item, index) => normalizeRoutineRecord(item, index)).filter((item) => item.name) : [];
+  return sortRoutines(normalized);
+}
+
+function writeRoutines(routines) {
+  const normalized = sortRoutines((Array.isArray(routines) ? routines : []).map((item, index) => normalizeRoutineRecord(item, index)).filter((item) => item.name));
+  writeJsonFile(ROUTINES_PATH, normalized);
+  return normalized;
+}
+
+function runPythonJson(scriptPath, args = [], inputPayload = null) {
+  const pythonCmd = String(process.env.PYTHON_BIN || 'python').trim() || 'python';
+  const preferUv = (process.env.PYTHON_USE_UV || '').trim() === '1' || pythonCmd === 'uv';
+  const attempts = preferUv
+    ? [
+        { command: 'uv', args: ['run', 'python', scriptPath, ...args] },
+        { command: pythonCmd === 'uv' ? 'python' : pythonCmd, args: [scriptPath, ...args] }
+      ]
+    : [
+        { command: pythonCmd, args: [scriptPath, ...args] },
+        { command: 'uv', args: ['run', 'python', scriptPath, ...args] }
+      ];
+
+  let lastFailure = 'Unknown error';
+
+  for (const attempt of attempts) {
+    const result = spawnSync(attempt.command, attempt.args, {
+      cwd: ROOT,
+      encoding: 'utf8',
+      timeout: 30000,
+      env: process.env,
+      input: inputPayload ? JSON.stringify(inputPayload) : undefined
+    });
+
+    if (result.error) {
+      lastFailure = result.error.message || `Failed to start ${attempt.command}`;
+      continue;
+    }
+
+    if (result.status !== 0) {
+      lastFailure = (result.stderr || result.stdout || '').trim() || `Command ${attempt.command} exited with status ${result.status}`;
+      continue;
+    }
+
+    try {
+      return { data: JSON.parse(result.stdout || '{}') };
+    } catch {
+      lastFailure = 'Python analyzer returned invalid JSON.';
+    }
+  }
+
+  return {
+    error: `Python analyzer failed: ${lastFailure}`
+  };
+}
+
 function makeHistoryRecordFromRequest(input) {
   const title = String(input.title || '').trim();
   const notes = String(input.notes || '').trim();
   const tags = Array.isArray(input.tags)
-    ? input.tags.map(tag => String(tag || '').trim().toLowerCase()).filter(Boolean)
-    : String(input.tags || '').split(',').map(tag => tag.trim().toLowerCase()).filter(Boolean);
+    ? input.tags.map((tag) => String(tag || '').trim().toLowerCase()).filter(Boolean)
+    : String(input.tags || '').split(',').map((tag) => tag.trim().toLowerCase()).filter(Boolean);
   const uploadedAt = new Date().toISOString();
   const id = `${Date.now()}-${Math.random().toString(16).slice(2, 8)}`;
 
@@ -245,16 +299,6 @@ function makeHistoryRecordFromRequest(input) {
   };
 }
 
-function sendJson(res, code, payload) {
-  res.writeHead(code, {
-    'Content-Type': 'application/json; charset=utf-8',
-    'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Methods': 'GET,PUT,POST,DELETE,OPTIONS',
-    'Access-Control-Allow-Headers': 'Content-Type'
-  });
-  res.end(JSON.stringify(payload));
-}
-
 function serveStatic(req, res) {
   const reqPath = req.url.split('?')[0] || '/';
   const filePath = reqPath === '/'
@@ -295,39 +339,19 @@ const server = http.createServer((req, res) => {
   }
 
   if (pathname === '/api/medical-profile' && req.method === 'GET') {
-    fs.readFile(PROFILE_PATH, 'utf8', (err, text) => {
-      if (err) {
-        sendJson(res, 200, {
-          schemaVersion: 2,
-          source: 'rescuenow-medical-id',
-          updatedAt: '',
-          patient: { bloodGroup: '', allergies: [], conditions: [] },
-          emergencyDoctor: { raw: '' },
-          medications: [],
-          historyRecords: []
-        });
-        return;
-      }
-
-      try {
-        sendJson(res, 200, JSON.parse(text));
-      } catch {
-        sendJson(res, 500, { error: 'Invalid JSON in medical-profile.json' });
-      }
-    });
+    const profile = readJsonFile(PROFILE_PATH, createEmptyMedicalProfile());
+    sendJson(res, 200, profile);
     return;
   }
 
   if (pathname === '/api/medical-profile' && req.method === 'PUT') {
     parseJsonBody(req, res, 20_000_000, (parsed) => {
-      fs.writeFile(PROFILE_PATH, JSON.stringify(parsed, null, 2), 'utf8', err => {
-        if (err) {
-          sendJson(res, 500, { error: 'Failed to write medical-profile.json' });
-          return;
-        }
-        clearSupplementCache();
+      try {
+        writeJsonFile(PROFILE_PATH, parsed);
         sendJson(res, 200, { ok: true });
-      });
+      } catch {
+        sendJson(res, 500, { error: 'Failed to write medical-profile.json' });
+      }
     });
     return;
   }
@@ -341,7 +365,6 @@ const server = http.createServer((req, res) => {
           sendJson(res, 400, { error });
           return;
         }
-        clearSupplementCache();
         sendJson(res, 200, record);
       } catch {
         sendJson(res, 500, { error: 'Failed to save history record file.' });
@@ -365,7 +388,6 @@ const server = http.createServer((req, res) => {
       }
 
       fs.unlink(absolutePath, () => {
-        clearSupplementCache();
         sendJson(res, 200, { ok: true });
       });
     });
@@ -373,59 +395,66 @@ const server = http.createServer((req, res) => {
   }
 
   if (pathname === '/api/recommended-supplements' && req.method === 'GET') {
-    const profileHash = getAnalysisCacheKey();
-    const cached = readSupplementCache();
-
-    if (cached && cached.profileHash === profileHash) {
-      sendJson(res, 200, {
-        ...cached.data,
-        cached: true,
-        cacheGeneratedAt: cached.generatedAt || ''
-      });
-      return;
-    }
-
-    const { data, error } = runSupplementAnalyzer();
+    const { data, error } = runPythonJson(SUPPLEMENT_SCRIPT, [PROFILE_PATH, ROOT]);
     if (error) {
       sendJson(res, 500, { error });
       return;
     }
+    sendJson(res, 200, data);
+    return;
+  }
 
-    writeSupplementCache(profileHash, data);
+  if (pathname === '/api/routines' && req.method === 'GET') {
+    sendJson(res, 200, readRoutines());
+    return;
+  }
 
-    sendJson(res, 200, {
-      ...data,
-      cached: false,
-      cacheGeneratedAt: new Date().toISOString()
+  if (pathname === '/api/routines' && req.method === 'PUT') {
+    parseJsonBody(req, res, 5_000_000, (parsed) => {
+      try {
+        const saved = writeRoutines(parsed);
+        sendJson(res, 200, saved);
+      } catch {
+        sendJson(res, 500, { error: 'Failed to write routines.json' });
+      }
+    });
+    return;
+  }
+
+  if (pathname === '/api/generate-routines' && req.method === 'POST') {
+    parseJsonBody(req, res, 2_000_000, (parsed) => {
+      const { data, error } = runPythonJson(ROUTINE_SCRIPT, [PROFILE_PATH, ROOT], parsed || {});
+      if (error) {
+        sendJson(res, 500, { error });
+        return;
+      }
+
+      try {
+        const saved = writeRoutines(data?.routines || []);
+        sendJson(res, 200, {
+          routines: saved,
+          analysis: data?.analysis || null
+        });
+      } catch {
+        sendJson(res, 500, { error: 'Failed to save generated routines.' });
+      }
     });
     return;
   }
 
   if (pathname === '/api/contacts' && req.method === 'GET') {
-    fs.readFile(CONTACTS_PATH, 'utf8', (err, text) => {
-      if (err) {
-        sendJson(res, 200, []);
-        return;
-      }
-
-      try {
-        sendJson(res, 200, JSON.parse(text));
-      } catch {
-        sendJson(res, 500, { error: 'Invalid JSON in contacts.json' });
-      }
-    });
+    sendJson(res, 200, readJsonFile(CONTACTS_PATH, []));
     return;
   }
 
   if (pathname === '/api/contacts' && req.method === 'PUT') {
     parseJsonBody(req, res, 2_000_000, (parsed) => {
-      fs.writeFile(CONTACTS_PATH, JSON.stringify(parsed, null, 2), 'utf8', err => {
-        if (err) {
-          sendJson(res, 500, { error: 'Failed to write contacts.json' });
-          return;
-        }
+      try {
+        writeJsonFile(CONTACTS_PATH, parsed);
         sendJson(res, 200, { ok: true });
-      });
+      } catch {
+        sendJson(res, 500, { error: 'Failed to write contacts.json' });
+      }
     });
     return;
   }
@@ -434,7 +463,8 @@ const server = http.createServer((req, res) => {
 });
 
 loadDotEnv();
+ensureRoutinesFile();
 
 server.listen(PORT, () => {
-  console.log(`RescueNow local server running at http://localhost:${PORT}`);
+  console.log(`Heartify local server running at http://localhost:${PORT}`);
 });

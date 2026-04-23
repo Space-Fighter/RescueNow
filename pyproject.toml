@@ -1,5 +1,5 @@
 [project]
-name = "rescuenow-health-ingestion"
+name = "heartify-health-ingestion"
 version = "0.1.0"
 description = "PDF lab ingestion, supplement recommendations, and plotting utilities"
 requires-python = ">=3.11"

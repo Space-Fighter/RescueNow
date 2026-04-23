@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Rescuenow | Emergency Hub</title>
+    <title>Heartify | Emergency Hub</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <style>
@@ -129,7 +129,7 @@
                 <div class="absolute inset-0 bg-white/80 backdrop-blur-[2px]"></div>
                 
                 <div class="text-center z-10 mb-8">
-                    <h1 class="text-4xl font-extrabold text-slate-900 tracking-tight">RescueNow</h1>
+                    <h1 class="text-4xl font-extrabold text-slate-900 tracking-tight">Heartify</h1>
                     <p class="text-slate-600 font-semibold uppercase tracking-widest text-[10px] mt-1">Ready for anything</p>
                 </div>
                 
@@ -431,7 +431,7 @@
         function createEmptyMedicalProfile() {
             return {
                 schemaVersion: MEDICAL_SCHEMA_VERSION,
-                source: 'rescuenow-medical-id',
+                source: 'heartify-medical-id',
                 updatedAt: '',
                 patient: {
                     bloodGroup: '',
@@ -465,7 +465,7 @@
             if (raw.schemaVersion === MEDICAL_SCHEMA_VERSION && raw.patient && Array.isArray(raw.medications)) {
                 return {
                     schemaVersion: MEDICAL_SCHEMA_VERSION,
-                    source: raw.source || 'rescuenow-medical-id',
+                    source: raw.source || 'heartify-medical-id',
                     updatedAt: raw.updatedAt || '',
                     patient: {
                         bloodGroup: raw.patient.bloodGroup || '',
@@ -485,7 +485,7 @@
             // Legacy v1 migration support.
             return {
                 schemaVersion: MEDICAL_SCHEMA_VERSION,
-                source: 'rescuenow-medical-id',
+                source: 'heartify-medical-id',
                 updatedAt: '',
                 patient: {
                     bloodGroup: raw.bloodGroup || '',
