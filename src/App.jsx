@@ -208,7 +208,104 @@ const getRoutineColors = (type) => {
   };
 };
 
-function TrendChart({ label, points }) {
+const AHA_RANGES = {
+  total_cholesterol: {
+    label: 'Total Cholesterol',
+    unit: 'mg/dL',
+    low: '< 200',
+    normal: '200 - 239',
+    high: '>= 240',
+    note: 'Desirable is below 200 mg/dL.'
+  },
+  ldl: {
+    label: 'LDL',
+    unit: 'mg/dL',
+    low: '< 100',
+    normal: '100 - 129',
+    high: '>= 130',
+    note: 'Lower is better for LDL.'
+  },
+  hdl: {
+    label: 'HDL',
+    unit: 'mg/dL',
+    low: '< 40',
+    normal: '40 - 59',
+    high: '>= 60',
+    note: '40 mg/dL or higher is generally preferred; 60+ is protective.'
+  },
+  triglycerides: {
+    label: 'Triglycerides',
+    unit: 'mg/dL',
+    low: '< 150',
+    normal: '150 - 199',
+    high: '>= 200',
+    note: 'Aim to stay below 150 mg/dL.'
+  },
+  fasting_glucose: {
+    label: 'Fasting Glucose',
+    unit: 'mg/dL',
+    low: '< 70',
+    normal: '70 - 99',
+    high: '>= 100',
+    note: 'Normal fasting glucose is usually 70-99 mg/dL.'
+  },
+  hba1c: {
+    label: 'HbA1c',
+    unit: '%',
+    low: '< 5.7',
+    normal: '5.7 - 6.4',
+    high: '>= 6.5',
+    note: 'AHA-aligned diabetes risk discussions often start above 5.7%.'
+  },
+  hemoglobin: {
+    label: 'Hemoglobin',
+    unit: 'g/dL',
+    low: 'Below range',
+    normal: 'Within range',
+    high: 'Above range',
+    note: 'Lab-specific reference ranges vary by sex and age.'
+  }
+};
+
+const AHA_ADVICE = {
+  total_cholesterol: {
+    low: 'If cholesterol is already low, maintain a balanced diet with healthy fats from nuts, seeds, olive oil, and fish.',
+    normal: 'Keep up fiber-rich meals, regular movement, and weight management to stay in range.',
+    high: 'Reduce fried foods, butter, and high saturated-fat meals. Increase soluble fiber from oats, beans, apples, and vegetables. Regular cardio can help lower levels.'
+  },
+  ldl: {
+    low: 'A low LDL is generally favorable. Continue your current habits and avoid unnecessary restrictive dieting.',
+    normal: 'Maintain a heart-healthy diet with vegetables, legumes, whole grains, and regular exercise.',
+    high: 'Focus on soluble fiber, nuts, seeds, olive oil, and fewer processed foods. Discuss omega-3s, psyllium, or clinician-guided therapy if needed.'
+  },
+  hdl: {
+    low: 'To raise HDL, aim for brisk walking, cycling, strength training, healthy fats, nuts, avocado, and fatty fish. Avoid smoking.',
+    normal: 'Maintain consistent exercise, a balanced diet, and healthy body weight to preserve HDL.',
+    high: 'High HDL is usually protective. Keep your current exercise and diet habits steady.'
+  },
+  triglycerides: {
+    low: 'Low triglycerides are generally favorable. Keep a balanced diet and regular activity.',
+    normal: 'Stay consistent with limiting sugary drinks, refined carbs, and excess alcohol.',
+    high: 'Cut back on sugar, white flour, sweets, and alcohol. Add omega-3 rich foods like salmon, sardines, chia, and flax. Daily walking after meals can help.'
+  },
+  fasting_glucose: {
+    low: 'If you feel shaky or weak, discuss symptoms with a clinician. Otherwise, keep meals balanced with protein and complex carbs.',
+    normal: 'Maintain balanced meals, portion control, regular activity, and consistent sleep.',
+    high: 'Reduce refined carbs and sugary drinks, add more fiber and protein, and walk for 10-20 minutes after meals. Speak with your doctor if the pattern continues.'
+  },
+  hba1c: {
+    low: 'No special correction is usually needed unless your clinician has raised concerns.',
+    normal: 'Keep a stable routine with balanced meals, movement, and sleep.',
+    high: 'Use a low-glycemic pattern with vegetables, legumes, protein, and fiber. Exercise regularly and limit sweets, refined grains, and sugary beverages.'
+  },
+  hemoglobin: {
+    low: 'Add iron-rich foods such as spinach, lentils, beans, eggs, meat, and vitamin C foods to support absorption. Iron supplements should only be taken with medical advice.',
+    normal: 'Maintain a balanced diet and regular checkups.',
+    high: 'Stay hydrated and discuss persistent elevation with a clinician, especially if you have other symptoms.'
+  }
+};
+
+function TrendChart({ label, points, metricKey = '' }) {
   if (!Array.isArray(points) || points.length < 2) {
     return (
       <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4">
@@ -236,19 +333,76 @@ function TrendChart({ label, points }) {
   }).join(' ');
 
   const latest = points[points.length - 1];
+  const safeMetricKey = String(metricKey || label || '').toLowerCase();
+  const rangeInfo = AHA_RANGES[safeMetricKey] || {
+    label,
+    unit: 'mg/dL',
+    low: 'Check lab range',
+    normal: 'Check lab range',
+    high: 'Check lab range',
+    note: 'Use the reference range reported by the lab for this parameter.'
+  };
+  const advice = AHA_ADVICE[safeMetricKey] || {
+    low: 'Use your lab report and doctor guidance to interpret a low result.',
+    normal: 'Maintain healthy diet, movement, sleep, and periodic monitoring.',
+    high: 'Reduce risk factors, review diet and lifestyle, and discuss the result with your clinician.'
+  };
 
   return (
-    <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4">
-      <div className="flex items-center justify-between mb-2">
+    <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 space-y-3">
+      <div className="flex items-center justify-between gap-3">
         <h4 className="font-black text-sm tracking-tight text-slate-700">{label}</h4>
         <span className="text-xs text-slate-500 font-semibold">Latest: {latest.value}</span>
       </div>
       <svg viewBox="0 0 100 36" className="w-full h-24">
         <path d={path} fill="none" stroke="#ef4444" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
       </svg>
-      <div className="flex items-center justify-between mt-1 text-[11px] text-slate-500 font-semibold">
+      <div className="flex items-center justify-between text-[11px] text-slate-500 font-semibold">
         <span>{formatShortDate(points[0]?.date)}</span>
         <span>{formatShortDate(latest?.date)}</span>
+      </div>
+
+      <div className="grid gap-3 lg:grid-cols-2">
+        <div className="rounded-2xl border border-slate-200 bg-white p-3">
+          <div className="flex items-center justify-between gap-2 mb-2">
+            <p className="text-xs font-black uppercase tracking-widest text-slate-400">AHA Range Table</p>
+            <span className="text-[10px] font-semibold text-slate-500">{rangeInfo.unit}</span>
+          </div>
+          <div className="overflow-hidden rounded-xl border border-slate-200">
+            <table className="w-full text-left text-xs">
+              <thead className="bg-slate-100 text-slate-600">
+                <tr>
+                  <th className="px-3 py-2 font-black uppercase tracking-wide">Level</th>
+                  <th className="px-3 py-2 font-black uppercase tracking-wide">Range</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-200 bg-white text-slate-700">
+                <tr>
+                  <td className="px-3 py-2 font-bold text-amber-700">Low</td>
+                  <td className="px-3 py-2">{rangeInfo.low}</td>
+                </tr>
+                <tr>
+                  <td className="px-3 py-2 font-bold text-emerald-700">Normal</td>
+                  <td className="px-3 py-2">{rangeInfo.normal}</td>
+                </tr>
+                <tr>
+                  <td className="px-3 py-2 font-bold text-red-700">High</td>
+                  <td className="px-3 py-2">{rangeInfo.high}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <p className="mt-2 text-[11px] leading-relaxed text-slate-500">{rangeInfo.note}</p>
+        </div>
+
+        <div className="rounded-2xl border border-slate-200 bg-white p-3">
+          <p className="text-xs font-black uppercase tracking-widest text-slate-400 mb-2">What To Do If</p>
+          <div className="space-y-2 text-sm leading-relaxed text-slate-700">
+            <p><span className="font-bold text-amber-700">Low:</span> {advice.low}</p>
+            <p><span className="font-bold text-emerald-700">Normal:</span> {advice.normal}</p>
+            <p><span className="font-bold text-red-700">High:</span> {advice.high}</p>
+          </div>
+        </div>
       </div>
     </div>
   );
@@ -1098,7 +1252,7 @@ export default function App() {
                 </div>
                 <div className="space-y-3">
                   {Object.entries(supplementData.chartSeries || {}).map(([metric, config]) => (
-                    <TrendChart key={metric} label={config.label || metric} points={config.points || []} />
+                    <TrendChart key={metric} label={config.label || metric} points={config.points || []} metricKey={metric} />
                   ))}
                   {Object.keys(supplementData.chartSeries || {}).length === 0 && (
                     <p className="text-sm text-slate-500 font-semibold">No chartable numeric values were extracted from blood/lipid records yet.</p>
