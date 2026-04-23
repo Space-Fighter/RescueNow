@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import exerciseCatalog from './exerciseCatalog.json';
 import {
   createHistoryRecord,
   deleteHistoryRecordFile,
@@ -24,6 +25,8 @@ const EMPTY = {
 };
 
 const ROUTINE_TYPES = ['Exercise', 'Supplement', 'Study', 'Custom'];
+const FOCUS_SECONDS = 25 * 60;
+const BREAK_SECONDS = 5 * 60;
 
 const CONTACTS = [
   { name: 'National Emergency', num: '112', color: 'bg-red-600', icon: 'fa-shield-halved' },
@@ -122,6 +125,45 @@ const formatShortDate = (value) => {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return 'N/A';
   return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+};
+
+const formatTimer = (seconds) => {
+  const safeSeconds = Math.max(0, Number(seconds) || 0);
+  const minutes = Math.floor(safeSeconds / 60);
+  const remainingSeconds = safeSeconds % 60;
+  return `${String(minutes).padStart(2, '0')}:${String(remainingSeconds).padStart(2, '0')}`;
+};
+
+const getYoutubeEmbedUrl = (url) => {
+  const raw = String(url || '').trim();
+  if (!raw) return '';
+
+  try {
+    const parsed = new URL(raw);
+    if (parsed.hostname.includes('youtu.be')) {
+      const id = parsed.pathname.replace('/', '');
+      return id ? `https://www.youtube.com/embed/${id}` : '';
+    }
+
+    if (parsed.hostname.includes('youtube.com')) {
+      const videoId = parsed.searchParams.get('v');
+      if (videoId) return `https://www.youtube.com/embed/${videoId}`;
+
+      const pathParts = parsed.pathname.split('/').filter(Boolean);
+      if (pathParts[0] === 'shorts' && pathParts[1]) {
+        return `https://www.youtube.com/embed/${pathParts[1]}`;
+      }
+    }
+  } catch {
+    return '';
+  }
+
+  return '';
+};
+
+const getRandomCatalogItem = (items) => {
+  if (!Array.isArray(items) || items.length === 0) return null;
+  return items[Math.floor(Math.random() * items.length)] || null;
 };
 
 const compareTime = (a, b) => {
@@ -254,6 +296,17 @@ export default function App() {
   const [routineModalOpen, setRoutineModalOpen] = useState(false);
   const [routineDraft, setRoutineDraft] = useState(buildRoutineDraft());
   const [routinesLoaded, setRoutinesLoaded] = useState(false);
+  const [timerMode, setTimerMode] = useState('focus');
+  const [timeLeft, setTimeLeft] = useState(FOCUS_SECONDS);
+  const [timerRunning, setTimerRunning] = useState(false);
+  const [focusFinished, setFocusFinished] = useState(false);
+  const [breakFinished, setBreakFinished] = useState(false);
+  const [timerMessage, setTimerMessage] = useState('Tap the timer to begin a 25-minute focus session.');
+  const [selectedActivity, setSelectedActivity] = useState(null);
+  const [showCatalog, setShowCatalog] = useState(false);
+  const [catalogType, setCatalogType] = useState('All');
+  const [catalogDifficulty, setCatalogDifficulty] = useState('All');
+  const [catalogMuscleGroup, setCatalogMuscleGroup] = useState('All');
 
   useEffect(() => {
     getMedicalProfile().then(setProfile);
@@ -273,6 +326,37 @@ export default function App() {
     if (supplementData || supplementLoading) return;
     void loadSupplements();
   }, [tab, supplementData, supplementLoading]);
+
+  useEffect(() => {
+    if (!timerRunning) return undefined;
+
+    const intervalId = window.setInterval(() => {
+      setTimeLeft((previous) => {
+        if (previous <= 1) {
+          window.clearInterval(intervalId);
+          setTimerRunning(false);
+
+          if (timerMode === 'focus') {
+            setFocusFinished(true);
+            setBreakFinished(false);
+            setTimerMessage('Pomodoro complete. Start a 5-minute recovery break or jump into another session.');
+          } else {
+            setBreakFinished(true);
+            setFocusFinished(false);
+            setTimerMode('focus');
+            setTimeLeft(FOCUS_SECONDS);
+            setTimerMessage('Break complete. Start another Pomodoro when you are ready.');
+          }
+
+          return 0;
+        }
+
+        return previous - 1;
+      });
+    }, 1000);
+
+    return () => window.clearInterval(intervalId);
+  }, [timerRunning, timerMode]);
 
   useEffect(() => {
     if (tab !== 'routines') return;
@@ -555,10 +639,92 @@ export default function App() {
     }
   };
 
+  const pickRandomActivity = () => {
+    const nextActivity = getRandomCatalogItem(exerciseCatalog);
+    if (nextActivity) {
+      setSelectedActivity(nextActivity);
+      setShowCatalog(false);
+    }
+  };
+
+  const startFocusSession = () => {
+    setTimerMode('focus');
+    setTimeLeft(FOCUS_SECONDS);
+    setTimerRunning(true);
+    setFocusFinished(false);
+    setBreakFinished(false);
+    setTimerMessage('Focus mode is on. Stay with one task until the timer ends.');
+  };
+
+  const startBreakSession = () => {
+    setTimerMode('break');
+    setTimeLeft(BREAK_SECONDS);
+    setTimerRunning(true);
+    setFocusFinished(false);
+    setBreakFinished(false);
+    if (!selectedActivity) {
+      const nextActivity = getRandomCatalogItem(exerciseCatalog);
+      if (nextActivity) setSelectedActivity(nextActivity);
+    }
+    setTimerMessage('Recovery break started. Follow the suggested activity or choose one from the catalog.');
+  };
+
+  const toggleTimerFromHome = () => {
+    if (timerMode === 'focus' && !timerRunning && timeLeft === FOCUS_SECONDS && !focusFinished) {
+      startFocusSession();
+      return;
+    }
+
+    if (timerMode === 'break' && !timerRunning && timeLeft === BREAK_SECONDS) {
+      startBreakSession();
+      return;
+    }
+
+    if (timerRunning) {
+      setTimerRunning(false);
+      setTimerMessage(timerMode === 'focus' ? 'Pomodoro paused.' : 'Break paused.');
+      return;
+    }
+
+    if (timeLeft > 0) {
+      setTimerRunning(true);
+      setTimerMessage(timerMode === 'focus' ? 'Pomodoro resumed.' : 'Break resumed.');
+      return;
+    }
+
+    if (focusFinished) {
+      startBreakSession();
+      return;
+    }
+
+    startFocusSession();
+  };
+
   const currentFirstAid = filteredFirstAid.find((item) => item.id === activeFirstAid);
   const currentDisaster = DISASTER_DATA.find((item) => item.id === activeDisaster);
   const supplementList = Array.isArray(supplementData?.recommendations?.supplements) ? supplementData.recommendations.supplements : [];
   const cautionList = Array.isArray(supplementData?.recommendations?.caution) ? supplementData.recommendations.caution : [];
+  const breakModeVisible = timerMode === 'break' || focusFinished || breakFinished;
+  const catalogTypes = ['All', ...new Set(exerciseCatalog.map((item) => item.Exercise_type))];
+  const catalogDifficulties = ['All', ...new Set(exerciseCatalog.map((item) => item.Difficulty))];
+  const catalogMuscleGroups = useMemo(() => {
+    const values = exerciseCatalog.flatMap((item) => item.Muscle_groups || []);
+    return ['All', ...new Set(values)];
+  }, []);
+  const filteredActivities = useMemo(() => (
+    exerciseCatalog.filter((item) => {
+      if (catalogType !== 'All' && item.Exercise_type !== catalogType) return false;
+      if (catalogDifficulty !== 'All' && item.Difficulty !== catalogDifficulty) return false;
+
+      const needsMuscleGroupFilter = catalogType === 'Strengthening' || catalogType === 'Stretching';
+      if (needsMuscleGroupFilter && catalogMuscleGroup !== 'All' && !(item.Muscle_groups || []).includes(catalogMuscleGroup)) {
+        return false;
+      }
+
+      return true;
+    })
+  ), [catalogType, catalogDifficulty, catalogMuscleGroup]);
+  const selectedActivityEmbed = getYoutubeEmbedUrl(selectedActivity?.Youtube_Video);
 
   const routineCards = useMemo(() => {
     const sorted = [...routines].sort((a, b) => compareTime(a.startTime, b.startTime));
@@ -573,23 +739,213 @@ export default function App() {
         <section className="p-6 space-y-4">
           <div className="text-center pt-6">
             <h1 className="text-4xl font-black tracking-tight">Heartify</h1>
-            <p className="text-slate-500 text-xs uppercase tracking-widest font-bold mt-1">Ready for anything</p>
+            <p className="text-slate-500 text-xs uppercase tracking-widest font-bold mt-1">Focus meets health</p>
           </div>
 
-          <div className="bg-white rounded-[2rem] p-5 shadow-sm border border-slate-200">
-            <p className="text-xs font-black uppercase tracking-[0.2em] text-red-500">Quick Actions</p>
-            <div className="grid grid-cols-2 gap-3 mt-4">
-              <button onClick={() => setTab('analysis')} className="p-4 rounded-2xl bg-slate-50 text-left font-bold">View Analysis</button>
-              <button onClick={() => setTab('routines')} className="p-4 rounded-2xl bg-slate-50 text-left font-bold">Daily Routines</button>
-              <button onClick={() => setTab('medical')} className="p-4 rounded-2xl bg-slate-50 text-left font-bold">Medical Records</button>
-              <button onClick={() => setTab('wiki')} className="p-4 rounded-2xl bg-red-500 text-white text-left font-bold">First Aid Wiki</button>
+          <div className="bg-gradient-to-br from-rose-100 via-white to-emerald-100 rounded-[2.5rem] p-6 border border-white shadow-sm">
+            <p className="text-xs font-black uppercase tracking-[0.2em] text-rose-500 text-center">
+              {timerMode === 'focus' && !focusFinished ? 'Pomodoro Session' : 'Break Session'}
+            </p>
+            <button
+              type="button"
+              onClick={toggleTimerFromHome}
+              className="w-72 h-72 max-w-full mx-auto mt-5 rounded-full bg-white shadow-[0_30px_80px_rgba(15,23,42,0.12)] border-[10px] border-rose-100 flex flex-col items-center justify-center text-slate-900 active:scale-[0.99] transition-transform"
+            >
+              <span className="text-[11px] font-black uppercase tracking-[0.3em] text-slate-400">
+                {timerRunning ? (timerMode === 'focus' ? 'In Focus' : 'On Break') : 'Tap To Start'}
+              </span>
+              <span className="text-6xl font-black tracking-tight mt-3">{formatTimer(timeLeft)}</span>
+              <span className="text-sm font-bold text-slate-500 mt-3">
+                {timerMode === 'focus' && !focusFinished ? '25 minute focus block' : '5 minute recovery block'}
+              </span>
+            </button>
+            <p className="text-center text-sm font-semibold text-slate-600 mt-5">{timerMessage}</p>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <button
+              type="button"
+              onClick={startFocusSession}
+              className="p-4 rounded-2xl bg-slate-900 text-white text-left font-bold"
+            >
+              Start Pomodoro
+            </button>
+            <button
+              type="button"
+              onClick={startBreakSession}
+              className="p-4 rounded-2xl bg-emerald-500 text-white text-left font-bold"
+            >
+              Start 5 Min Break
+            </button>
+          </div>
+
+          {focusFinished && (
+            <div className="grid grid-cols-1 gap-3">
+              <button
+                type="button"
+                onClick={startBreakSession}
+                className="w-full rounded-2xl bg-emerald-500 text-white px-4 py-4 font-black text-sm"
+              >
+                Start 5 Minute Break
+              </button>
+              <button
+                type="button"
+                onClick={startFocusSession}
+                className="w-full rounded-2xl bg-slate-100 text-slate-800 px-4 py-4 font-black text-sm"
+              >
+                Do Another Pomodoro
+              </button>
             </div>
-          </div>
+          )}
 
-          <div className="bg-gradient-to-br from-slate-900 to-slate-700 rounded-[2rem] p-6 text-white">
-            <p className="text-xs uppercase tracking-[0.2em] font-black text-white/60">Today</p>
-            <h2 className="text-2xl font-black mt-2">Keep your medical records updated and generate routines when new test files are added.</h2>
-          </div>
+          {breakModeVisible && (
+            <>
+              <div className="bg-white rounded-[2rem] p-5 shadow-sm border border-slate-200">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <p className="text-xs font-black uppercase tracking-[0.2em] text-amber-500">Mystery Box</p>
+                    <h2 className="text-2xl font-black mt-2">Pick a healthy break activity</h2>
+                    <p className="text-sm text-slate-500 font-semibold mt-1">Get a random exercise, stretch, or meditation for your break.</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={pickRandomActivity}
+                    className="w-16 h-16 rounded-[1.4rem] bg-amber-100 text-amber-600 flex items-center justify-center text-2xl"
+                    title="Open mystery box"
+                  >
+                    <i className="fa-solid fa-gift" />
+                  </button>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3 mt-4">
+                  <button
+                    type="button"
+                    onClick={pickRandomActivity}
+                    className="rounded-2xl bg-amber-500 text-white px-4 py-3 font-black text-sm"
+                  >
+                    Roll The Dice
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setShowCatalog((current) => !current)}
+                    className="rounded-2xl bg-slate-100 text-slate-800 px-4 py-3 font-black text-sm"
+                  >
+                    Choose Activity
+                  </button>
+                </div>
+              </div>
+
+              {showCatalog && (
+                <div className="bg-white rounded-[2rem] p-5 shadow-sm border border-slate-200 space-y-4">
+                  <div>
+                    <p className="text-xs font-black uppercase tracking-[0.2em] text-slate-400">Activity Catalog</p>
+                    <h3 className="text-xl font-black mt-2">Filter your break activity</h3>
+                  </div>
+
+                  <select value={catalogType} onChange={(e) => setCatalogType(e.target.value)} className="w-full bg-slate-50 p-3 rounded-2xl font-semibold">
+                    {catalogTypes.map((type) => (
+                      <option key={type} value={type}>{type}</option>
+                    ))}
+                  </select>
+
+                  <select value={catalogDifficulty} onChange={(e) => setCatalogDifficulty(e.target.value)} className="w-full bg-slate-50 p-3 rounded-2xl font-semibold">
+                    {catalogDifficulties.map((difficulty) => (
+                      <option key={difficulty} value={difficulty}>{difficulty}</option>
+                    ))}
+                  </select>
+
+                  {(catalogType === 'Strengthening' || catalogType === 'Stretching') && (
+                    <select value={catalogMuscleGroup} onChange={(e) => setCatalogMuscleGroup(e.target.value)} className="w-full bg-slate-50 p-3 rounded-2xl font-semibold">
+                      {catalogMuscleGroups.map((group) => (
+                        <option key={group} value={group}>{group}</option>
+                      ))}
+                    </select>
+                  )}
+
+                  <div className="space-y-2 max-h-72 overflow-y-auto pr-1">
+                    {filteredActivities.map((item) => (
+                      <button
+                        key={item.Exercise_ID}
+                        type="button"
+                        onClick={() => {
+                          setSelectedActivity(item);
+                          setShowCatalog(false);
+                        }}
+                        className="w-full text-left bg-slate-50 rounded-2xl p-4 border border-slate-200"
+                      >
+                        <div className="flex items-center justify-between gap-2">
+                          <p className="font-black text-slate-800">{item.Exercise_Name}</p>
+                          <span className="text-[11px] font-black uppercase tracking-wide text-slate-500">{item.Difficulty}</span>
+                        </div>
+                        <p className="text-xs text-slate-500 font-semibold mt-1">{item.Exercise_type}</p>
+                        <p className="text-xs text-slate-500 mt-2">{item.Muscle_groups.join(', ')}</p>
+                      </button>
+                    ))}
+                    {filteredActivities.length === 0 && (
+                      <p className="text-sm text-slate-500 font-semibold">No activities match the selected filters.</p>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {selectedActivity && (
+                <div className="bg-white rounded-[2rem] p-5 shadow-sm border border-slate-200 space-y-4">
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <p className="text-xs font-black uppercase tracking-[0.2em] text-emerald-500">Selected Activity</p>
+                      <h3 className="text-2xl font-black mt-2">{selectedActivity.Exercise_Name}</h3>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={pickRandomActivity}
+                      className="px-4 py-2 rounded-2xl bg-slate-100 text-slate-800 font-black text-sm"
+                    >
+                      Roll Again
+                    </button>
+                  </div>
+
+                  <div className="flex flex-wrap gap-2">
+                    <span className="px-3 py-1 rounded-full bg-blue-100 text-blue-700 text-xs font-black uppercase tracking-wide">{selectedActivity.Exercise_type}</span>
+                    <span className="px-3 py-1 rounded-full bg-slate-100 text-slate-700 text-xs font-black uppercase tracking-wide">{selectedActivity.Difficulty}</span>
+                    {selectedActivity.Muscle_groups.map((group) => (
+                      <span key={group} className="px-3 py-1 rounded-full bg-emerald-100 text-emerald-700 text-xs font-black uppercase tracking-wide">{group}</span>
+                    ))}
+                  </div>
+
+                  {selectedActivityEmbed ? (
+                    <div className="rounded-[1.5rem] overflow-hidden bg-slate-950 aspect-video">
+                      <iframe
+                        className="w-full h-full"
+                        src={selectedActivityEmbed}
+                        title={selectedActivity.Exercise_Name}
+                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                        allowFullScreen
+                      />
+                    </div>
+                  ) : (
+                    <a
+                      href={selectedActivity.Youtube_Video}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="inline-flex px-4 py-3 rounded-2xl bg-slate-900 text-white font-black text-sm"
+                    >
+                      Open Video
+                    </a>
+                  )}
+                </div>
+              )}
+
+              {breakFinished && (
+                <button
+                  type="button"
+                  onClick={startFocusSession}
+                  className="w-full rounded-2xl bg-slate-900 text-white px-4 py-4 font-black text-sm"
+                >
+                  Start Pomodoro Again
+                </button>
+              )}
+            </>
+          )}
         </section>
       )}
 
@@ -1174,6 +1530,7 @@ export default function App() {
             { id: 'analysis', icon: 'fa-chart-line', label: 'Analysis' },
             { id: 'routines', icon: 'fa-list-check', label: 'Routines' },
             { id: 'medical', icon: 'fa-notes-medical', label: 'Medical' },
+            { id: 'wiki', icon: 'fa-briefcase-medical', label: 'Wiki' },
             { id: 'emergency', icon: 'fa-triangle-exclamation', label: 'Emergency' }
           ].map((item) => (
             <button key={item.id} onClick={() => setTab(item.id)} className={`flex flex-col items-center gap-1 ${tab === item.id ? 'text-red-600' : 'text-slate-400'}`}>

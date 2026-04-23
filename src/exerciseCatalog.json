@@ -1,0 +1,98 @@
+[
+  {
+    "Exercise_ID": "EX001",
+    "Exercise_Name": "Box Breathing",
+    "Muscle_groups": ["mind", "breathing"],
+    "Exercise_type": "Meditation",
+    "Difficulty": "Beginner",
+    "Youtube_Video": "https://www.youtube.com/watch?v=tEmt1Znux58"
+  },
+  {
+    "Exercise_ID": "EX002",
+    "Exercise_Name": "Seated Neck Stretch",
+    "Muscle_groups": ["neck", "shoulders"],
+    "Exercise_type": "Stretching",
+    "Difficulty": "Beginner",
+    "Youtube_Video": "https://www.youtube.com/watch?v=2NOsE-VPpkE"
+  },
+  {
+    "Exercise_ID": "EX003",
+    "Exercise_Name": "Standing Hamstring Stretch",
+    "Muscle_groups": ["hamstrings", "legs"],
+    "Exercise_type": "Stretching",
+    "Difficulty": "Beginner",
+    "Youtube_Video": "https://www.youtube.com/watch?v=sHvur2PUEvg"
+  },
+  {
+    "Exercise_ID": "EX004",
+    "Exercise_Name": "Desk Shoulder Rolls",
+    "Muscle_groups": ["shoulders", "upper-back"],
+    "Exercise_type": "Stretching",
+    "Difficulty": "Beginner",
+    "Youtube_Video": "https://www.youtube.com/watch?v=6jHsraw2NIk"
+  },
+  {
+    "Exercise_ID": "EX005",
+    "Exercise_Name": "Jumping Jacks",
+    "Muscle_groups": ["legs", "full-body"],
+    "Exercise_type": "Cardio",
+    "Difficulty": "Beginner",
+    "Youtube_Video": "https://www.youtube.com/watch?v=c4DAnQ6DtF8"
+  },
+  {
+    "Exercise_ID": "EX006",
+    "Exercise_Name": "High Knees",
+    "Muscle_groups": ["legs", "core"],
+    "Exercise_type": "Cardio",
+    "Difficulty": "Intermediate",
+    "Youtube_Video": "https://www.youtube.com/watch?v=DfjpR6dzLVg"
+  },
+  {
+    "Exercise_ID": "EX007",
+    "Exercise_Name": "Wall Push-Ups",
+    "Muscle_groups": ["chest", "shoulders", "arms"],
+    "Exercise_type": "Strengthening",
+    "Difficulty": "Beginner",
+    "Youtube_Video": "https://www.youtube.com/watch?v=Eh00_rniF8E"
+  },
+  {
+    "Exercise_ID": "EX008",
+    "Exercise_Name": "Bodyweight Squats",
+    "Muscle_groups": ["legs", "glutes"],
+    "Exercise_type": "Strengthening",
+    "Difficulty": "Beginner",
+    "Youtube_Video": "https://www.youtube.com/watch?v=aclHkVaku9U"
+  },
+  {
+    "Exercise_ID": "EX009",
+    "Exercise_Name": "Forearm Plank",
+    "Muscle_groups": ["abs", "core", "shoulders"],
+    "Exercise_type": "Strengthening",
+    "Difficulty": "Intermediate",
+    "Youtube_Video": "https://www.youtube.com/watch?v=pSHjTRCQxIw"
+  },
+  {
+    "Exercise_ID": "EX010",
+    "Exercise_Name": "Guided 5-Minute Meditation",
+    "Muscle_groups": ["mind", "breathing"],
+    "Exercise_type": "Meditation",
+    "Difficulty": "Beginner",
+    "Youtube_Video": "https://www.youtube.com/watch?v=inpok4MKVLM"
+  },
+  {
+    "Exercise_ID": "EX011",
+    "Exercise_Name": "Cat-Cow Stretch",
+    "Muscle_groups": ["back", "spine", "shoulders"],
+    "Exercise_type": "Stretching",
+    "Difficulty": "Beginner",
+    "Youtube_Video": "https://www.youtube.com/watch?v=kqnua4rHVVA"
+  },
+  {
+    "Exercise_ID": "EX012",
+    "Exercise_Name": "Mountain Climbers",
+    "Muscle_groups": ["abs", "legs", "shoulders"],
+    "Exercise_type": "Cardio",
+    "Difficulty": "Advanced",
+    "Youtube_Video": "https://www.youtube.com/watch?v=nmwgirgXLYM"
+  }
+]
