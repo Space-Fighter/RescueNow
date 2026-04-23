@@ -24,7 +24,7 @@ const readAsDataUrl = (file) => new Promise((resolve, reject) => {
 });
 
 const formatBytes = (value) => {
-  if (!value) return '0 B';
+  if (!Number.isFinite(value) || value <= 0) return '0 B';
   if (value < 1024) return `${value} B`;
   if (value < 1024 * 1024) return `${(value / 1024).toFixed(1)} KB`;
   return `${(value / (1024 * 1024)).toFixed(1)} MB`;
@@ -183,7 +183,6 @@ export default function App() {
   const [activeFirstAid, setActiveFirstAid] = useState(FIRST_AID_DATA[0].id);
   const [activeDisaster, setActiveDisaster] = useState(DISASTER_DATA[0].id);
   const [wikiSearch, setWikiSearch] = useState('');
-  const [sosOpen, setSosOpen] = useState(false);
 
   const [contacts, setContacts] = useState([]);
   const [contactName, setContactName] = useState('');
@@ -380,9 +379,6 @@ export default function App() {
     });
   };
 
-  const openSOS = () => setSosOpen(true);
-  const closeSOS = () => setSosOpen(false);
-
   const addContact = (e) => {
     e.preventDefault();
     if (!contactName.trim() || !contactNumber.trim()) return;
@@ -445,61 +441,18 @@ export default function App() {
 
   return (
     <main className="max-w-md mx-auto min-h-screen pb-24 bg-slate-50">
-      {sosOpen && (
-        <div className="fixed inset-0 z-50 bg-black/95 text-white p-6 overflow-y-auto">
-          <div className="flex items-center justify-between mb-6">
-            <h2 className="text-2xl font-black tracking-tight">Emergency Broadcast</h2>
-            <button onClick={closeSOS} className="w-10 h-10 rounded-full bg-white/20">
-              <i className="fa-solid fa-xmark" />
-            </button>
-          </div>
-          <a href="tel:112" className="block w-full text-center bg-white text-red-600 rounded-3xl py-8 font-black text-5xl mb-4">112</a>
-          <div className="grid grid-cols-2 gap-3 mb-4">
-            {CONTACTS.slice(1).map(c => (
-              <a key={c.num} href={`tel:${c.num}`} className="bg-white/10 border border-white/20 rounded-2xl p-4 text-center">
-                <p className="text-xs text-white/60 font-black uppercase tracking-widest">{c.name}</p>
-                <p className="text-2xl font-black">{c.num}</p>
-              </a>
-            ))}
-          </div>
-          {(profile.patient.bloodGroup || profile.patient.allergies.length > 0) && (
-            <div className="bg-white/10 border border-white/20 rounded-2xl p-4 mb-4">
-              <p className="text-xs uppercase tracking-widest text-white/60 font-black mb-2">Medical ID</p>
-              <p><span className="font-bold">Blood Group:</span> {profile.patient.bloodGroup || 'Unknown'}</p>
-              <p><span className="font-bold">Allergies:</span> {profile.patient.allergies.join(', ') || 'None recorded'}</p>
-            </div>
-          )}
-          {contacts.length > 0 && (
-            <div className="space-y-2">
-              {contacts.map((c, idx) => (
-                <a key={`${c.name}-${idx}`} href={`tel:${c.num}`} className="flex items-center justify-between bg-white/10 rounded-xl p-3">
-                  <span className="font-bold">{c.name}</span>
-                  <span className="text-white/70 text-sm">{c.num}</span>
-                </a>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
-
       {tab === 'home' && (
         <section className="p-6 space-y-4">
           <div className="text-center pt-6">
             <h1 className="text-4xl font-black tracking-tight">RescueNow</h1>
             <p className="text-slate-500 text-xs uppercase tracking-widest font-bold mt-1">Ready for anything</p>
           </div>
-          <div className="flex justify-center py-6">
-            <button onClick={openSOS} className="relative w-40 h-40 rounded-full bg-red-600 text-white text-5xl font-black shadow-2xl">
-              <span className="absolute inset-0 rounded-full animate-ping bg-red-500 opacity-30" />
-              <span className="relative">SOS</span>
-            </button>
-          </div>
           <div className="grid grid-cols-2 gap-3">
-            <button onClick={() => setTab('contacts')} className="p-5 bg-white rounded-3xl shadow text-left font-bold">Phone Circle</button>
+            <button onClick={() => setTab('emergency')} className="p-5 bg-white rounded-3xl shadow text-left font-bold">SOS Circle</button>
             <button onClick={() => setTab('nearby')} className="p-5 bg-white rounded-3xl shadow text-left font-bold">Find Help</button>
           </div>
           <button onClick={() => setTab('medical')} className="w-full p-5 bg-white rounded-3xl shadow text-left font-bold">Medical Profile</button>
-          <button onClick={() => setTab('supplements')} className="w-full p-5 bg-white rounded-3xl shadow text-left font-bold">Recommended Supplements</button>
+          <button onClick={() => setTab('supplements')} className="w-full p-5 bg-white rounded-3xl shadow text-left font-bold">Analysis</button>
           <button onClick={() => setTab('wiki')} className="w-full p-5 bg-gradient-to-r from-red-600 to-red-400 text-white rounded-3xl shadow text-left font-bold">First Aid Wiki</button>
         </section>
       )}
@@ -509,10 +462,10 @@ export default function App() {
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-2xl bg-red-100 text-red-500 flex items-center justify-center">
-                <i className="fa-solid fa-pills" />
+                <i className="fa-solid fa-chart-line" />
               </div>
               <div>
-                <h2 className="text-2xl font-black tracking-tight">Recommended Supplement</h2>
+                <h2 className="text-2xl font-black tracking-tight">Analysis</h2>
                 <p className="text-xs text-slate-500 font-semibold">Built from blood and lipid test history</p>
               </div>
             </div>
@@ -599,22 +552,33 @@ export default function App() {
         </section>
       )}
 
-      {tab === 'contacts' && (
+      {tab === 'emergency' && (
         <section className="p-6 space-y-4">
-          <h2 className="text-3xl font-black tracking-tight">Phone Circle</h2>
-          <div className="space-y-2">
-            {CONTACTS.map(c => (
-              <a key={c.num} href={`tel:${c.num}`} className="flex items-center p-4 bg-white rounded-2xl shadow-sm">
-                <div className={`${c.color} w-12 h-12 rounded-2xl text-white flex items-center justify-center`}><i className={`fa-solid ${c.icon}`} /></div>
-                <div className="ml-4">
-                  <p className="font-bold">{c.name}</p>
-                  <p className="text-xs text-slate-500 font-black tracking-widest">{c.num}</p>
-                </div>
-              </a>
-            ))}
+          <div className="bg-black/95 text-white rounded-3xl p-6 space-y-4">
+            <div className="text-center">
+              <h2 className="text-2xl font-black tracking-tight">SOS</h2>
+              <p className="text-xs text-white/60 uppercase tracking-widest font-bold mt-1">Immediate help and critical details</p>
+            </div>
+            <a href="tel:112" className="block w-full text-center bg-white text-red-600 rounded-3xl py-8 font-black text-5xl">112</a>
+            <div className="grid grid-cols-2 gap-3">
+              {CONTACTS.slice(1).map(c => (
+                <a key={c.num} href={`tel:${c.num}`} className="bg-white/10 border border-white/20 rounded-2xl p-4 text-center">
+                  <p className="text-xs text-white/60 font-black uppercase tracking-widest">{c.name}</p>
+                  <p className="text-2xl font-black">{c.num}</p>
+                </a>
+              ))}
+            </div>
+            {(profile.patient.bloodGroup || profile.patient.allergies.length > 0) && (
+              <div className="bg-white/10 border border-white/20 rounded-2xl p-4">
+                <p className="text-xs uppercase tracking-widest text-white/60 font-black mb-2">Medical ID</p>
+                <p><span className="font-bold">Blood Group:</span> {profile.patient.bloodGroup || 'Unknown'}</p>
+                <p><span className="font-bold">Allergies:</span> {profile.patient.allergies.join(', ') || 'None recorded'}</p>
+              </div>
+            )}
           </div>
+
           <div className="bg-white rounded-3xl p-5 shadow space-y-3">
-            <h3 className="text-xs uppercase tracking-widest font-black text-slate-400">Trusted Contacts</h3>
+            <h3 className="text-xs uppercase tracking-widest font-black text-slate-400">SOS Circle</h3>
             {contacts.map((c, i) => (
               <div key={`${c.name}-${i}`} className="flex items-center justify-between p-3 bg-slate-50 rounded-2xl">
                 <div>
@@ -630,7 +594,7 @@ export default function App() {
             <form onSubmit={addContact} className="space-y-2">
               <input value={contactName} onChange={(e) => setContactName(e.target.value)} placeholder="Name" className="w-full bg-slate-50 p-3 rounded-2xl font-semibold" />
               <input value={contactNumber} onChange={(e) => setContactNumber(e.target.value)} placeholder="Number" className="w-full bg-slate-50 p-3 rounded-2xl font-semibold" />
-              <button className="w-full bg-slate-900 text-white p-3 rounded-2xl font-bold">Add to Circle</button>
+              <button className="w-full bg-slate-900 text-white p-3 rounded-2xl font-bold">Add to SOS Circle</button>
             </form>
           </div>
         </section>
@@ -973,11 +937,11 @@ export default function App() {
         <div className="max-w-md mx-auto flex justify-around py-3">
           {[
             { id: 'home', icon: 'fa-house-chimney-crack', label: 'Home' },
-            { id: 'contacts', icon: 'fa-phone-volume', label: 'Circle' },
             { id: 'medical', icon: 'fa-notes-medical', label: 'Medical' },
-            { id: 'supplements', icon: 'fa-pills', label: 'Supps' },
+            { id: 'supplements', icon: 'fa-chart-line', label: 'Analysis' },
             { id: 'nearby', icon: 'fa-location-arrow', label: 'Maps' },
-            { id: 'wiki', icon: 'fa-briefcase-medical', label: 'Wiki' }
+            { id: 'wiki', icon: 'fa-briefcase-medical', label: 'Wiki' },
+            { id: 'emergency', icon: 'fa-triangle-exclamation', label: 'SOS' }
           ].map(item => (
             <button key={item.id} onClick={() => setTab(item.id)} className={`flex flex-col items-center gap-1 ${tab === item.id ? 'text-red-600' : 'text-slate-400'}`}>
               <i className={`fa-solid ${item.icon}`} />
