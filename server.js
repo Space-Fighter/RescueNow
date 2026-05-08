@@ -123,7 +123,7 @@ function writeJsonFile(filePath, value) {
 function createEmptyMedicalProfile() {
   return {
     schemaVersion: 2,
-    source: 'heartify-medical-id',
+    source: 'medical-id',
     updatedAt: '',
     patient: { bloodGroup: '', allergies: [], conditions: [] },
     emergencyDoctor: { raw: '' },
@@ -466,5 +466,5 @@ loadDotEnv();
 ensureRoutinesFile();
 
 server.listen(PORT, () => {
-  console.log(`Heartify local server running at http://localhost:${PORT}`);
+  console.log(`Touch Grass local server running at http://localhost:${PORT}`);
 });

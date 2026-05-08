@@ -16,7 +16,7 @@ import {
 
 const EMPTY = {
   schemaVersion: 2,
-  source: 'heartify-medical-id',
+  source: 'medical-id',
   updatedAt: '',
   patient: { bloodGroup: '', allergies: [], conditions: [] },
   emergencyDoctor: { raw: '' },
@@ -132,6 +132,51 @@ const formatTimer = (seconds) => {
   const minutes = Math.floor(safeSeconds / 60);
   const remainingSeconds = safeSeconds % 60;
   return `${String(minutes).padStart(2, '0')}:${String(remainingSeconds).padStart(2, '0')}`;
+};
+
+const TIMER_ALARM_DURATION_SECONDS = 15;
+const TIMER_ALARM_PATTERN_OFFSETS = [0, 0.2, 0.4];
+const TIMER_ALARM_CYCLE_SECONDS = 0.8;
+
+const playTimerAlarm = () => {
+  try {
+    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+    if (!AudioCtx) return;
+
+    const audioCtx = new AudioCtx();
+    const now = audioCtx.currentTime;
+    for (
+      let cycleStart = 0;
+      cycleStart < TIMER_ALARM_DURATION_SECONDS;
+      cycleStart += TIMER_ALARM_CYCLE_SECONDS
+    ) {
+      TIMER_ALARM_PATTERN_OFFSETS.forEach((offset, index) => {
+        const startAt = cycleStart + offset;
+        if (startAt >= TIMER_ALARM_DURATION_SECONDS) return;
+
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+
+        osc.type = 'sine';
+        osc.frequency.value = index % 2 === 0 ? 880 : 660;
+
+        gain.gain.setValueAtTime(0.0001, now + startAt);
+        gain.gain.exponentialRampToValueAtTime(0.18, now + startAt + 0.02);
+        gain.gain.exponentialRampToValueAtTime(0.0001, now + startAt + 0.15);
+
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.start(now + startAt);
+        osc.stop(now + startAt + 0.16);
+      });
+    }
+
+    window.setTimeout(() => {
+      void audioCtx.close().catch(() => {});
+    }, (TIMER_ALARM_DURATION_SECONDS + 0.5) * 1000);
+  } catch {
+    // Ignore audio failures (for example, autoplay restrictions).
+  }
 };
 
 const getYoutubeEmbedUrl = (url) => {
@@ -467,6 +512,15 @@ export default function App() {
   const [catalogMuscleGroup, setCatalogMuscleGroup] = useState('All');
 
   useEffect(() => {
+    document.body.classList.remove('theme-dark');
+      try {
+      window.localStorage.removeItem('touch-grass-theme');
+    } catch {
+      // Ignore storage access errors.
+    }
+  }, []);
+
+  useEffect(() => {
     getMedicalProfile().then(setProfile);
     getContacts().then(setContacts);
     getRoutines().then((data) => {
@@ -493,6 +547,7 @@ export default function App() {
         if (previous <= 1) {
           window.clearInterval(intervalId);
           setTimerRunning(false);
+          playTimerAlarm();
 
           if (timerMode === 'focus') {
             setFocusFinished(true);
@@ -928,11 +983,11 @@ export default function App() {
   }, [routines, routineFilter]);
 
   return (
-    <main className="max-w-md mx-auto min-h-screen pb-24 bg-slate-50">
+    <main className="w-full max-w-6xl mx-auto min-h-screen pb-24 px-6 md:px-10 xl:px-12 bg-slate-50 text-slate-900">
       {tab === 'home' && (
         <section className="p-6 space-y-4">
           <div className="text-center pt-6">
-            <h1 className="text-4xl font-black tracking-tight">Heartify</h1>
+            <h1 className="text-4xl font-black tracking-tight">Touch Grass</h1>
             <p className="text-slate-500 text-xs uppercase tracking-widest font-bold mt-1">Focus meets health</p>
           </div>
 
@@ -943,7 +998,7 @@ export default function App() {
             <button
               type="button"
               onClick={toggleTimerFromHome}
-              className="w-72 h-72 max-w-full mx-auto mt-5 rounded-full bg-white shadow-[0_30px_80px_rgba(15,23,42,0.12)] border-[10px] border-rose-100 flex flex-col items-center justify-center text-slate-900 active:scale-[0.99] transition-transform"
+              className="w-[26rem] h-[26rem] max-w-full mx-auto mt-5 rounded-full bg-white shadow-[0_30px_80px_rgba(15,23,42,0.12)] border-[10px] border-rose-100 flex flex-col items-center justify-center text-slate-900 active:scale-[0.99] transition-transform"
             >
               <span className="text-[11px] font-black uppercase tracking-[0.3em] text-slate-400">
                 {timerRunning ? (timerMode === 'focus' ? 'In Focus' : 'On Break') : 'Tap To Start'}
@@ -1758,8 +1813,8 @@ export default function App() {
         </section>
       )}
 
-      <nav className="fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur border-t border-slate-200 z-40">
-        <div className="max-w-md mx-auto flex justify-around py-3">
+      <nav className="fixed bottom-0 left-0 right-0 backdrop-blur border-t z-40 bg-white/95 border-slate-200">
+        <div className="max-w-6xl mx-auto flex justify-center gap-8 md:gap-12 py-3 px-6">
           {[
             { id: 'home', icon: 'fa-house-chimney-crack', label: 'Home' },
             { id: 'analysis', icon: 'fa-chart-line', label: 'Analysis' },
@@ -1778,7 +1833,7 @@ export default function App() {
 
       {routineModalOpen && (
         <div className="fixed inset-0 z-50 bg-slate-950/55 backdrop-blur-sm flex items-end sm:items-center justify-center p-4">
-          <div className="w-full max-w-md bg-white rounded-[2rem] p-5 shadow-2xl">
+          <div className="w-full max-w-2xl bg-white rounded-[2rem] p-6 shadow-2xl">
             <div className="flex items-center justify-between mb-4">
               <div>
                 <p className="text-xs font-black uppercase tracking-[0.2em] text-red-500">{routineDraft.id ? 'Edit Routine' : 'Add Manual Routine'}</p>

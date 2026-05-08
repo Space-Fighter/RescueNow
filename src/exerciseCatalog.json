@@ -94,5 +94,133 @@
     "Exercise_type": "Cardio",
     "Difficulty": "Advanced",
     "Youtube_Video": "https://www.youtube.com/watch?v=nmwgirgXLYM"
+  },
+  {
+    "Exercise_ID": "EX013",
+    "Exercise_Name": "Forward Lunges",
+    "Muscle_groups": ["legs", "glutes"],
+    "Exercise_type": "Strengthening",
+    "Difficulty": "Beginner",
+    "Youtube_Video": "https://www.youtube.com/watch?v=QOVaHwm-Q6U"
+  },
+  {
+    "Exercise_ID": "EX014",
+    "Exercise_Name": "Side Lunges",
+    "Muscle_groups": ["legs", "inner-thighs"],
+    "Exercise_type": "Strengthening",
+    "Difficulty": "Intermediate",
+    "Youtube_Video": "https://www.youtube.com/watch?v=rvqLVxYqEvo"
+  },
+  {
+    "Exercise_ID": "EX015",
+    "Exercise_Name": "Glute Bridge",
+    "Muscle_groups": ["glutes", "lower-back"],
+    "Exercise_type": "Strengthening",
+    "Difficulty": "Beginner",
+    "Youtube_Video": "https://www.youtube.com/watch?v=YRqoIM0u0PY"
+  },
+  {
+    "Exercise_ID": "EX016",
+    "Exercise_Name": "Side Plank",
+    "Muscle_groups": ["core", "abs"],
+    "Exercise_type": "Strengthening",
+    "Difficulty": "Intermediate",
+    "Youtube_Video": "https://www.youtube.com/watch?v=K2VljzCC16g"
+  },
+  {
+    "Exercise_ID": "EX017",
+    "Exercise_Name": "Arm Circles",
+    "Muscle_groups": ["shoulders"],
+    "Exercise_type": "Stretching",
+    "Difficulty": "Beginner",
+    "Youtube_Video": "https://www.youtube.com/watch?v=140RTNMciH8"
+  },
+  {
+    "Exercise_ID": "EX018",
+    "Exercise_Name": "Standing Calf Raises",
+    "Muscle_groups": ["calves", "legs"],
+    "Exercise_type": "Strengthening",
+    "Difficulty": "Beginner",
+    "Youtube_Video": "https://www.youtube.com/watch?v=-M4-G8p8fmc"
+  },
+  {
+    "Exercise_ID": "EX019",
+    "Exercise_Name": "Wall Sit",
+    "Muscle_groups": ["legs", "quads"],
+    "Exercise_type": "Strengthening",
+    "Difficulty": "Intermediate",
+    "Youtube_Video": "https://www.youtube.com/watch?v=y-wV4Venusw"
+  },
+  {
+    "Exercise_ID": "EX020",
+    "Exercise_Name": "Standing Quad Stretch",
+    "Muscle_groups": ["quadriceps", "legs"],
+    "Exercise_type": "Stretching",
+    "Difficulty": "Beginner",
+    "Youtube_Video": "https://www.youtube.com/watch?v=zi5__zBRzYc"
+  },
+  {
+    "Exercise_ID": "EX021",
+    "Exercise_Name": "Child's Pose Stretch",
+    "Muscle_groups": ["back", "spine"],
+    "Exercise_type": "Stretching",
+    "Difficulty": "Beginner",
+    "Youtube_Video": "https://www.youtube.com/watch?v=eqVMAPM00DM"
+  },
+  {
+    "Exercise_ID": "EX022",
+    "Exercise_Name": "Cobra Stretch",
+    "Muscle_groups": ["spine", "abs"],
+    "Exercise_type": "Stretching",
+    "Difficulty": "Beginner",
+    "Youtube_Video": "https://www.youtube.com/watch?v=JDcdhTuycOI"
+  },
+  {
+    "Exercise_ID": "EX023",
+    "Exercise_Name": "Superman Hold",
+    "Muscle_groups": ["lower-back", "glutes"],
+    "Exercise_type": "Strengthening",
+    "Difficulty": "Intermediate",
+    "Youtube_Video": "https://www.youtube.com/watch?v=z6PJMT2y8GQ"
+  },
+  {
+    "Exercise_ID": "EX024",
+    "Exercise_Name": "Russian Twists",
+    "Muscle_groups": ["core", "abs"],
+    "Exercise_type": "Strengthening",
+    "Difficulty": "Intermediate",
+    "Youtube_Video": "https://www.youtube.com/watch?v=wkD8rjkodUI"
+  },
+  {
+    "Exercise_ID": "EX025",
+    "Exercise_Name": "Burpees",
+    "Muscle_groups": ["full-body"],
+    "Exercise_type": "Cardio",
+    "Difficulty": "Advanced",
+    "Youtube_Video": "https://www.youtube.com/watch?v=TU8QYVW0gDU"
+  },
+  {
+    "Exercise_ID": "EX026",
+    "Exercise_Name": "4-7-8 Breathing",
+    "Muscle_groups": ["mind", "breathing"],
+    "Exercise_type": "Meditation",
+    "Difficulty": "Beginner",
+    "Youtube_Video": "https://www.youtube.com/watch?v=gz4G31LGyog"
+  },
+  {
+    "Exercise_ID": "EX027",
+    "Exercise_Name": "Seated Torso Twist",
+    "Muscle_groups": ["spine", "core"],
+    "Exercise_type": "Stretching",
+    "Difficulty": "Beginner",
+    "Youtube_Video": "https://www.youtube.com/watch?v=UoC_O3HzsH0"
+  },
+  {
+    "Exercise_ID": "EX028",
+    "Exercise_Name": "Standing Side Stretch",
+    "Muscle_groups": ["obliques", "back"],
+    "Exercise_type": "Stretching",
+    "Difficulty": "Beginner",
+    "Youtube_Video": "https://www.youtube.com/watch?v=xt7-316u0M4"
   }
 ]

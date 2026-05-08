@@ -1,18 +1,22 @@
 {
-  "file_hash": "5e3cddf2e75a675de5fd46f5a1b8a2713192118c1a5e514cb420bba45d464e49",
+  "file_hash": "f25b0b7ac669718ec3c3a83b1a8dbb773839f1473db963c34d4eb3556eeb134a",
   "analysis_result": {
     "recordsConsidered": 3,
     "recommendations": {
       "supplements": [
-        "Omega-3 fatty acids: To help maintain healthy triglyceride levels and support cardiovascular health.",
-        "Niacin (Vitamin B3): May help increase HDL cholesterol levels.",
-        "Fiber supplements (e.g., psyllium husk): To support cholesterol management by reducing LDL cholesterol."
+        "Omega-3 fatty acids: May help reduce triglycerides and support heart health.",
+        "Niacin (Vitamin B3): Can help increase HDL cholesterol levels.",
+        "Fiber supplements (e.g., psyllium husk): May help lower LDL cholesterol."
       ],
-      "routines": [],
+      "routines": [
+        "Regular aerobic exercise",
+        "Balanced diet",
+        "Weight management"
+      ],
       "caution": [
-        "Please consult with a healthcare professional before starting any new supplements or making significant lifestyle changes. These suggestions are based on trends in lipid and blood test results but do not replace professional medical advice."
+        "Please consult your healthcare provider before starting any new supplements or routines to ensure they are safe and appropriate for your individual health status."
       ],
-      "summary": "The patient's lipid profile shows generally acceptable total cholesterol and LDL levels with some fluctuations in HDL and triglycerides. Focus on maintaining or improving HDL levels and managing triglycerides through diet, exercise, and possibly supplements may be beneficial. Doctor confirmation is required."
+      "summary": "Your lipid profile shows generally good total cholesterol and HDL levels with some fluctuations in LDL and triglycerides. Incorporating omega-3 supplements, niacin, and fiber along with lifestyle changes like regular exercise and a balanced diet may support improved lipid levels. Doctor confirmation is essential before making changes."
     },
     "chartSeries": {
       "total_cholesterol": {
@@ -122,5 +126,5 @@
     "apiUsed": true,
     "apiError": null
   },
-  "timestamp": "2026-04-23T10:46:55.839922+00:00"
+  "timestamp": "2026-05-08T01:24:43.231062+00:00"
 }

@@ -701,7 +701,7 @@ wheels = [
 ]
 
 [[package]]
-name = "heartify-health-ingestion"
+name = "touch-grass-health-ingestion"
 version = "0.1.0"
 source = { virtual = "." }
 dependencies = [

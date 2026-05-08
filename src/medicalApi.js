@@ -1,6 +1,6 @@
 const EMPTY = {
   schemaVersion: 2,
-  source: 'heartify-medical-id',
+  source: 'medical-id',
   updatedAt: '',
   patient: { bloodGroup: '', allergies: [], conditions: [] },
   emergencyDoctor: { raw: '' },
